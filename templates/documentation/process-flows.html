@@ -1,0 +1,19 @@
+{% extends "documentation/_doc_base.html" %}
+{% block doc_content %}
+{% for flow in flows %}
+<div class="border rounded p-3 mb-3">
+    <h6 class="fw-bold text-coop">{{ flow.title }}</h6>
+    <ol class="small mb-2">
+        {% for step in flow.steps %}
+        <li class="mb-1">{{ step }}</li>
+        {% endfor %}
+    </ol>
+    <div class="small text-muted">
+        <strong>App routes:</strong>
+        {% for route in flow.app_routes %}
+        <code class="me-2">{{ route }}</code>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

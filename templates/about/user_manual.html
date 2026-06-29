@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Manual — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        .manual-toc { position: sticky; top: calc(var(--topbar-height, 60px) + 1rem); }
+        .manual-toc a { display: block; padding: 0.35rem 0.75rem; color: #1B5E20; text-decoration: none; font-size: 0.85rem; border-radius: 6px; }
+        .manual-toc a:hover, .manual-toc a.active { background: #e8f5e9; }
+        .manual-section { scroll-margin-top: calc(var(--topbar-height, 60px) + 1rem); }
+        .manual-section h6 { color: #1B5E20; font-weight: 700; border-bottom: 2px solid #e8f5e9; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        .manual-section .section-icon { font-size: 1.1rem; margin-right: 0.35rem; }
+        .manual-note { background: #fff8e1; border-left: 4px solid #F9A825; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; font-size: 0.9rem; }
+        .manual-steps { counter-reset: step; list-style: none; padding-left: 0; }
+        .manual-steps li { counter-increment: step; padding: 0.4rem 0 0.4rem 2rem; position: relative; font-size: 0.9rem; }
+        .manual-steps li::before { content: counter(step); position: absolute; left: 0; width: 1.4rem; height: 1.4rem; background: #1B5E20; color: #fff; border-radius: 50%; font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+        .role-badge { font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+{% set page_title = "User Manual" %}
+{% set active_nav = "about" %}
+{% set about_slug = "user-manual" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card welcome-card mb-3">
+        <h4 class="mb-1">{{ system_name }} User Manual</h4>
+        <p class="mb-0">Version {{ system_version }} · Guide for cooperative staff and administrators</p>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-3">
+            <div class="dashboard-card manual-toc">
+                <h6 class="fw-bold text-coop small text-uppercase mb-2">Contents</h6>
+                <nav>
+                    {% for section in sections %}
+                    <a href="#{{ section.id }}"><i class="bi {{ section.icon }} me-1"></i> {{ section.title }}</a>
+                    {% endfor %}
+                </nav>
+            </div>
+        </div>
+
+        <div class="col-lg-9">
+            {% for section in sections %}
+            <div id="{{ section.id }}" class="dashboard-card manual-section mb-3">
+                <h6>
+                    <i class="bi {{ section.icon }} section-icon"></i>{{ section.title }}
+                    {% if section.route %}
+                    <a href="{{ section.route }}" class="btn btn-outline-success btn-sm float-end">
+                        <i class="bi bi-box-arrow-up-right"></i> Open
+                    </a>
+                    {% endif %}
+                </h6>
+
+                {% for block in section.content %}
+                    {% if block.type == 'paragraph' %}
+                    <p class="text-muted">{{ block.text }}</p>
+
+                    {% elif block.type == 'list' %}
+                    {% if block.title %}<p class="fw-semibold small mb-1">{{ block.title }}</p>{% endif %}
+                    <ul class="small">
+                        {% for item in block.entries %}
+                        <li class="mb-1">{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+
+                    {% elif block.type == 'steps' %}
+                    {% if block.title %}<p class="fw-semibold small mb-2">{{ block.title }}</p>{% endif %}
+                    <ol class="manual-steps mb-3">
+                        {% for step in block.entries %}
+                        <li>{{ step }}</li>
+                        {% endfor %}
+                    </ol>
+
+                    {% elif block.type == 'note' %}
+                    <div class="manual-note mb-3"><i class="bi bi-lightbulb me-1"></i> {{ block.text }}</div>
+
+                    {% elif block.type == 'table_ref' and block.ref == 'txn_types' %}
+                    {% if block.title %}<p class="fw-semibold small mb-2">{{ block.title }}</p>{% endif %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-success">
+                                <tr><th>Code</th><th>Description</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for txn in txn_types %}
+                                <tr><td><code>{{ txn.code }}</code></td><td>{{ txn.label }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            <div class="dashboard-card">
+                <h6 class="fw-bold text-coop">User Roles Reference</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-success">
+                            <tr><th>Role</th><th>Can Post</th><th>Admin</th><th>Access Summary</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for r in roles %}
+                            <tr>
+                                <td><span class="badge text-bg-light border role-badge">{{ r.role }}</span></td>
+                                <td>{% if r.can_post %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                                <td>{% if r.is_admin %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                                <td class="small">{{ r.summary }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

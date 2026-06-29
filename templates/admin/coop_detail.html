@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ coop.name }} — CoopBooks Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = coop.name %}
+{% set active_nav = "coops" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card mb-3">
+        <a href="{{ url_for('main_routes.admin_coops') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> Coop Registry</a>
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
+            {% if coop.logo_filename %}
+            <img src="{{ url_for('main_routes.coop_logo', slug=coop.slug, filename=coop.logo_filename) }}" alt="Logo" style="height:64px;max-width:120px;object-fit:contain">
+            {% endif %}
+            <div>
+                <h5 class="text-coop fw-bold mb-0">{{ coop.name }}</h5>
+                <code>{{ coop.slug }}</code> · DB: {{ coop.db_name }}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="dashboard-card">
+                <h6 class="fw-bold">Profile</h6>
+                <form method="post" class="row g-2">
+                    <input type="hidden" name="action" value="update_profile">
+                    <div class="col-12"><input type="text" name="name" class="form-control form-control-sm" value="{{ coop.name }}"></div>
+                    <div class="col-6">
+                        <select name="status" class="form-select form-select-sm">
+                            {% for s in coop.STATUSES %}
+                            <option value="{{ s }}" {% if coop.status == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6"><input type="text" name="registration_no" class="form-control form-control-sm" value="{{ coop.registration_no or '' }}" placeholder="CDA Reg"></div>
+                    <div class="col-6"><input type="text" name="tin" class="form-control form-control-sm" value="{{ coop.tin or '' }}" placeholder="TIN"></div>
+                    <div class="col-6"><input type="text" name="rdo" class="form-control form-control-sm" value="{{ coop.rdo or '' }}" placeholder="RDO"></div>
+                    <div class="col-12"><input type="text" name="coop_type" class="form-control form-control-sm" value="{{ coop.coop_type or '' }}" placeholder="Coop type"></div>
+                    <div class="col-12"><input type="text" name="address" class="form-control form-control-sm" value="{{ coop.address or '' }}" placeholder="Address"></div>
+                    <div class="col-12"><input type="email" name="contact_email" class="form-control form-control-sm" value="{{ coop.contact_email or '' }}" placeholder="Contact email"></div>
+                    <div class="col-12"><button type="submit" class="btn btn-coop btn-sm">Save Profile</button></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="dashboard-card">
+                <h6 class="fw-bold">Logo</h6>
+                <form method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="upload_logo">
+                    <input type="file" name="logo" class="form-control form-control-sm mb-2" accept="image/*">
+                    <button type="submit" class="btn btn-outline-success btn-sm">Upload Logo</button>
+                </form>
+            </div>
+
+            <div class="dashboard-card mt-3">
+                <h6 class="fw-bold">Module Subscriptions</h6>
+                <form method="post">
+                    <input type="hidden" name="action" value="update_modules">
+                    {% for key, spec in app_modules.items() %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="modules" value="{{ key }}" id="sub-{{ key }}"
+                               {% if key in active_modules %}checked{% endif %}>
+                        <label class="form-check-label" for="sub-{{ key }}">{{ spec.label }}</label>
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-coop btn-sm mt-2">Update Modules</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

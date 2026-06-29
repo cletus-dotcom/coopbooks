@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register Cooperative — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "Register Coop" %}
+{% set active_nav = "coops_register" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <a href="{{ url_for('main_routes.admin_coops') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> Coop Registry</a>
+        <h5 class="text-coop fw-bold mt-2 mb-3">Register New Cooperative</h5>
+
+        <form method="post" class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Coop Code (login slug)</label>
+                <input type="text" name="slug" class="form-control" required placeholder="e.g. acme-coop" pattern="[a-z0-9][a-z0-9-]{1,38}[a-z0-9]">
+                <div class="form-text">Lowercase letters, numbers, hyphens. Used at login.</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Cooperative Name</label>
+                <input type="text" name="name" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">CDA Registration No.</label>
+                <input type="text" name="registration_no" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">TIN</label>
+                <input type="text" name="tin" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">RDO</label>
+                <input type="text" name="rdo" class="form-control">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Coop Type</label>
+                <input type="text" name="coop_type" class="form-control" placeholder="Primary Multi-Purpose Cooperative">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Contact Email</label>
+                <input type="email" name="contact_email" class="form-control">
+            </div>
+            <div class="col-12">
+                <label class="form-label">Address</label>
+                <input type="text" name="address" class="form-control">
+            </div>
+
+            <div class="col-12"><hr><h6 class="fw-bold">Initial Coop Administrator</h6></div>
+            <div class="col-md-4">
+                <label class="form-label">Admin Username</label>
+                <input type="text" name="admin_username" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Admin Password</label>
+                <input type="password" name="admin_password" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Admin Full Name</label>
+                <input type="text" name="admin_fullname" class="form-control">
+            </div>
+
+            <div class="col-12"><hr><h6 class="fw-bold">Module Subscriptions</h6></div>
+            {% for key, spec in app_modules.items() %}
+            <div class="col-md-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="modules" value="{{ key }}" id="mod-{{ key }}"
+                           {% if spec.default_enabled %}checked{% endif %}>
+                    <label class="form-check-label" for="mod-{{ key }}">{{ spec.label }}</label>
+                </div>
+            </div>
+            {% endfor %}
+
+            <div class="col-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="seed_samples" id="seed_samples" checked>
+                    <label class="form-check-label" for="seed_samples">Include sample chart, members, and journals</label>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <button type="submit" class="btn btn-coop">Register Cooperative</button>
+            </div>
+        </form>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

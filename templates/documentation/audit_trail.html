@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audit Trail — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "Audit Trail" %}
+{% set active_nav = "documentation" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <a href="{{ url_for('main_routes.documentation_index') }}" class="small text-coop">
+                    <i class="bi bi-arrow-left"></i> Documentation
+                </a>
+                <h5 class="text-coop fw-bold mt-2 mb-0">System Audit Trail</h5>
+                <p class="small text-muted mb-0">{{ requirement.bir_reference }}</p>
+            </div>
+            <a href="{{ url_for('main_routes.documentation_book_pdf', book_type='audit-trail') }}"
+               class="btn btn-coop btn-sm">
+                <i class="bi bi-file-earmark-pdf"></i> Download PDF
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-success">
+                    <tr>
+                        <th>Date/Time</th><th>User</th><th>Action</th>
+                        <th>Entity</th><th>ID</th><th>Description</th><th>IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td class="small">{{ row.created_at }}</td>
+                        <td>{{ row.username }}</td>
+                        <td><span class="badge text-bg-light border">{{ row.action }}</span></td>
+                        <td>{{ row.entity_type }}</td>
+                        <td class="small">{{ row.entity_id }}</td>
+                        <td class="small">{{ row.entity_label }}</td>
+                        <td class="small text-muted">{{ row.ip_address or '—' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-muted">No audit records yet. Activity is logged on create, update, and delete operations.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

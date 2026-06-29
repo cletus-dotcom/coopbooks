@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Trial Balance — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "Trial Balance" %}
+{% set active_nav = "reports" %}
+{% set report_section = "bir-books" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <a href="{{ url_for('main_routes.reports_bir_books') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> Back</a>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+            <div>
+                <h5 class="text-coop fw-bold mb-0">Trial Balance</h5>
+                <p class="small text-muted mb-0">As of {{ as_of.strftime('%B %d, %Y') }}</p>
+            </div>
+            <a href="{{ url_for('main_routes.report_bir_book_pdf', book_type='trial-balance') }}" class="btn btn-coop btn-sm">
+                <i class="bi bi-file-earmark-pdf"></i> PDF
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-success">
+                    <tr><th>Code</th><th>Account</th><th>Type</th><th class="text-end">Debit</th><th class="text-end">Credit</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td><code>{{ row.code }}</code></td>
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.account_type }}</td>
+                        <td class="text-end">{% if row.debit %}₱{{ '{:,.2f}'.format(row.debit) }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if row.credit %}₱{{ '{:,.2f}'.format(row.credit) }}{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="3">Totals</td>
+                        <td class="text-end">₱{{ '{:,.2f}'.format(total_debit) }}</td>
+                        <td class="text-end">₱{{ '{:,.2f}'.format(total_credit) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

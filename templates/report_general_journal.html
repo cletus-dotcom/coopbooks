@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>General Journal — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "General Journal" %}
+{% set active_nav = "reports" %}
+{% set report_section = "bir-books" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <a href="{{ url_for('main_routes.reports_bir_books') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> Reports</a>
+                <h5 class="text-coop fw-bold mt-2 mb-0">General Journal</h5>
+                <p class="small text-muted mb-0">Book of Accounts — {{ coop.name if coop else 'Cooperative' }} · As of {{ as_of.strftime('%B %d, %Y') }}</p>
+            </div>
+            <a href="{{ url_for('main_routes.report_bir_book_pdf', book_type='general-journal') }}" class="btn btn-coop btn-sm">
+                <i class="bi bi-file-earmark-pdf"></i> PDF
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead class="table-success">
+                    <tr><th>Date</th><th>Entry #</th><th>Account</th><th>Description</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Posted By</th></tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    {% for line in entry.lines %}
+                    <tr>
+                        <td>{% if loop.first %}{{ entry.entry_date }}{% endif %}</td>
+                        <td>{% if loop.first %}<strong>{{ entry.entry_no }}</strong>{% endif %}</td>
+                        <td><code>{{ line.code }}</code> {{ line.name }}</td>
+                        <td class="small">{% if loop.first and entry.description %}{{ entry.description }}{% elif line.memo %}{{ line.memo }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if line.debit %}₱{{ '{:,.2f}'.format(line.debit) }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if line.credit %}₱{{ '{:,.2f}'.format(line.credit) }}{% else %}—{% endif %}</td>
+                        <td class="small">{% if loop.first %}{{ entry.posted_by or '—' }}{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr><td colspan="7" class="text-muted">No journal entries recorded.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

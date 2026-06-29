@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BIR CAS Documentation — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "BIR CAS Documentation" %}
+{% set active_nav = "documentation" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card welcome-card mb-3">
+        <h4 class="mb-2">BIR CAS Registration Documentation</h4>
+        <p class="mb-0">
+            Mandatory technical requirements for Computerized Accounting System (CAS) registration
+            per <strong>{{ bir_reference }}</strong>. Submit to your Revenue District Office (RDO)
+            for Acknowledgement Certificate within 3 working days.
+        </p>
+    </div>
+
+    <div class="dashboard-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="text-coop fw-bold mb-0">Mandatory Technical Requirements</h5>
+            <span class="badge bg-success">{{ system_name }} v{{ system_version }}</span>
+        </div>
+        <div class="row g-3">
+            {% for req in requirements %}
+            <div class="col-md-6">
+                <a href="{{ url_for('main_routes.documentation_view', slug=req.slug) }}" class="text-decoration-none">
+                    <div class="border rounded p-3 h-100">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi {{ req.icon }} text-coop fs-5"></i>
+                            <span class="fw-bold text-coop">{{ req.number }}. {{ req.title }}</span>
+                        </div>
+                        <p class="small text-muted mb-2">{{ req.description[:120] }}…</p>
+                        <span class="badge text-bg-light border">{{ req.bir_reference }}</span>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <h6 class="fw-bold">Documentary Requirements Checklist (Annex A)</h6>
+        <ul class="small mb-3">
+            {% for item in checklist %}
+            <li class="mb-2">
+                {{ item.item }}
+                {% if item.doc_slug %}
+                — <a href="{{ url_for('main_routes.documentation_view', slug=item.doc_slug) }}">View in app</a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_for('main_routes.documentation_audit_trail') }}" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-clock-history"></i> View Audit Trail
+            </a>
+            <a href="{{ url_for('main_routes.documentation_book_pdf', book_type='audit-trail') }}" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-file-earmark-pdf"></i> Audit Trail PDF
+            </a>
+            <a href="{{ bir_reference_url }}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-box-arrow-up-right"></i> BIR RMC 5-2021
+            </a>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

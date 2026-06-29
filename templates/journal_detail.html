@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ entry.entry_no }} — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = entry.entry_no %}
+{% set active_nav = "journal" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <a href="{{ url_for('main_routes.journal_list') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> Back to Journal</a>
+        <h5 class="text-coop fw-bold mt-2">{{ entry.entry_no }}</h5>
+        <p class="small text-muted mb-3">{{ entry.entry_date }} &middot; {{ entry.description or '—' }}<br>Ref: {{ entry.reference or '—' }} &middot; Posted by {{ entry.posted_by or '—' }}</p>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead class="table-success">
+                    <tr><th>Code</th><th>Account</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Memo</th></tr>
+                </thead>
+                <tbody>
+                    {% set ns = namespace(debit=0, credit=0) %}
+                    {% for line in entry.lines %}
+                    {% set ns.debit = ns.debit + (line.debit|float) %}
+                    {% set ns.credit = ns.credit + (line.credit|float) %}
+                    <tr>
+                        <td><code>{{ line.account.code }}</code></td>
+                        <td>{{ line.account.name }}</td>
+                        <td class="text-end">{% if line.debit %}₱{{ '{:,.2f}'.format(line.debit|float) }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if line.credit %}₱{{ '{:,.2f}'.format(line.credit|float) }}{% else %}—{% endif %}</td>
+                        <td class="small">{{ line.memo or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="2">Totals</td>
+                        <td class="text-end">₱{{ '{:,.2f}'.format(ns.debit) }}</td>
+                        <td class="text-end">₱{{ '{:,.2f}'.format(ns.credit) }}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

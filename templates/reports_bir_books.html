@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BIR Books of Accounts — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "BIR Books of Accounts" %}
+{% set active_nav = "reports" %}
+{% set report_section = "bir-books" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <h5 class="text-coop fw-bold mb-1">Books of Accounts</h5>
+        <p class="small text-muted mb-3">Layouts per BIR RR No. 9-2009 — printable and PDF exportable.</p>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <a href="{{ url_for('main_routes.report_general_journal') }}" class="text-decoration-none">
+                    <div class="border rounded p-3 h-100">
+                        <div class="fw-bold text-coop">General Journal</div>
+                        <p class="small text-muted mb-0">All posted journal entries.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6">
+                <a href="{{ url_for('main_routes.report_general_ledger') }}" class="text-decoration-none">
+                    <div class="border rounded p-3 h-100">
+                        <div class="fw-bold text-coop">General Ledger</div>
+                        <p class="small text-muted mb-0">Per-account ledger with running balances.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6">
+                <a href="{{ url_for('main_routes.report_trial_balance') }}" class="text-decoration-none">
+                    <div class="border rounded p-3 h-100">
+                        <div class="fw-bold text-coop">Trial Balance</div>
+                        <p class="small text-muted mb-0">Verify debits equal credits.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6">
+                <a href="{{ url_for('main_routes.report_member_subsidiary') }}" class="text-decoration-none">
+                    <div class="border rounded p-3 h-100">
+                        <div class="fw-bold text-coop">Member Subsidiary Ledger</div>
+                        <p class="small text-muted mb-0">Share capital and savings transaction detail.</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if 'bir_cas' in subscribed_modules %}
+    <div class="dashboard-card">
+        <h6 class="fw-bold">BIR CAS Registration (RMC 5-2021)</h6>
+        <p class="small text-muted">Mandatory technical requirements for CAS Acknowledgement Certificate.</p>
+        <a href="{{ url_for('main_routes.documentation_index') }}" class="btn btn-coop btn-sm">
+            <i class="bi bi-folder2-open"></i> BIR CAS Documentation
+        </a>
+    </div>
+    {% endif %}
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

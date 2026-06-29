@@ -1,0 +1,34 @@
+{% extends "documentation/_doc_base.html" %}
+{% block doc_content %}
+<p class="small">Sample print-outs per Annex A CDR Item 3 and RR No. 9-2009 Books of Accounts</p>
+
+<h6 class="fw-bold mt-3">Books Declared (Electronic — Head Office)</h6>
+<table class="table table-sm">
+    <thead><tr><th>Book / Report</th><th>Method</th><th>Location</th></tr></thead>
+    <tbody>
+        {% for book in books_declared %}
+        <tr><td>{{ book.name }}</td><td>{{ book.method }}</td><td>{{ book.location }}</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h6 class="fw-bold mt-4">Live Sample Layouts</h6>
+<div class="row g-2">
+    {% for report in reports %}
+    <div class="col-md-6">
+        <div class="border rounded p-3">
+            <div class="fw-bold text-coop">{{ report.bir_form }}</div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <a href="{{ url_for(report.route) }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-eye"></i> View
+                </a>
+                <a href="{{ url_for('main_routes.documentation_book_pdf', book_type=report.slug) }}"
+                   class="btn btn-coop btn-sm">
+                    <i class="bi bi-file-earmark-pdf"></i> PDF
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

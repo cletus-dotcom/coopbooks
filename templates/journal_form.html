@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>New Journal Entry — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "New Entry" %}
+{% set active_nav = "journal" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <h5 class="text-coop fw-bold mb-3">Post Journal Entry</h5>
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="alert alert-warning py-2 small">{{ msg }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+
+        <form method="POST" id="journalForm">
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Entry #</label>
+                    <input type="text" name="entry_no" class="form-control" value="{{ next_entry_no }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Date</label>
+                    <input type="date" name="entry_date" class="form-control" value="{{ default_date }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Reference</label>
+                    <input type="text" name="reference" class="form-control" placeholder="Voucher / OR number">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Description</label>
+                    <input type="text" name="description" class="form-control" required>
+                </div>
+            </div>
+
+            <h6 class="fw-bold">Journal Lines</h6>
+            <div id="linesContainer"></div>
+            <button type="button" class="btn btn-outline-success btn-sm mb-3" id="addLineBtn"><i class="bi bi-plus"></i> Add Line</button>
+
+            <div class="d-flex gap-3 mb-3 small">
+                <span>Total Debit: <strong id="totalDebit">₱0.00</strong></span>
+                <span>Total Credit: <strong id="totalCredit">₱0.00</strong></span>
+                <span id="balanceStatus" class="text-danger fw-bold">Not balanced</span>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-coop" id="submitBtn" disabled>Post Entry</button>
+                <a href="{{ url_for('main_routes.journal_list') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</main>
+
+<template id="lineTemplate">
+    <div class="row g-2 mb-2 journal-line">
+        <div class="col-md-5">
+            <select name="account_id" class="form-select form-select-sm" required>
+                <option value="">Select account...</option>
+                {% for acct in accounts %}
+                <option value="{{ acct.id }}">{{ acct.code }} — {{ acct.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-3 col-md-2"><input type="number" name="debit" class="form-control form-control-sm debit-input" step="0.01" min="0" placeholder="Debit"></div>
+        <div class="col-3 col-md-2"><input type="number" name="credit" class="form-control form-control-sm credit-input" step="0.01" min="0" placeholder="Credit"></div>
+        <div class="col-md-2"><input type="text" name="memo" class="form-control form-control-sm" placeholder="Memo"></div>
+        <div class="col-auto"><button type="button" class="btn btn-outline-danger btn-sm remove-line"><i class="bi bi-trash"></i></button></div>
+    </div>
+</template>
+
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script>
+    const container = document.getElementById('linesContainer');
+    const template = document.getElementById('lineTemplate');
+
+    function addLine() {
+        container.appendChild(template.content.cloneNode(true));
+        bindLineEvents();
+        recalc();
+    }
+
+    function bindLineEvents() {
+        container.querySelectorAll('.remove-line').forEach(btn => {
+            btn.onclick = () => { btn.closest('.journal-line').remove(); recalc(); };
+        });
+        container.querySelectorAll('.debit-input, .credit-input').forEach(inp => {
+            inp.oninput = recalc;
+        });
+    }
+
+    function recalc() {
+        let debit = 0, credit = 0;
+        container.querySelectorAll('.debit-input').forEach(i => debit += parseFloat(i.value) || 0);
+        container.querySelectorAll('.credit-input').forEach(i => credit += parseFloat(i.value) || 0);
+        const fmt = n => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('totalDebit').textContent = fmt(debit);
+        document.getElementById('totalCredit').textContent = fmt(credit);
+        const balanced = debit > 0 && debit === credit;
+        document.getElementById('balanceStatus').textContent = balanced ? 'Balanced ✓' : 'Not balanced';
+        document.getElementById('balanceStatus').className = balanced ? 'text-success fw-bold' : 'text-danger fw-bold';
+        document.getElementById('submitBtn').disabled = !balanced;
+    }
+
+    document.getElementById('addLineBtn').onclick = addLine;
+    addLine(); addLine();
+</script>
+</body>
+</html>

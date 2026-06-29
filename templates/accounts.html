@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ page_heading }} — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = page_heading %}
+{% set active_nav = "accounts" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        {% if filter_category or filter_code %}
+        <a href="{{ url_for('main_routes.accounts') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> All accounts</a>
+        {% endif %}
+        <h5 class="text-coop fw-bold mt-1">{{ page_heading }}</h5>
+        <p class="small text-muted mb-3">CDA MC 2022-24 Chart of Accounts{% if filter_category or filter_code %} — filtered view{% endif %}</p>
+        <input type="text" class="form-control form-control-sm mb-3" id="accountSearch" placeholder="Search by code or name...">
+        <div class="mobile-cards" id="accountsMobile">
+            {% for row in account_rows %}
+            {% set acct = row.account %}
+            <div class="border rounded p-3 mb-2 account-card" data-search="{{ acct.code }} {{ acct.name }} {{ acct.account_type }} {{ acct.category }}">
+                <div><code>{{ acct.code }}</code> <strong>{{ acct.name }}</strong></div>
+                <div class="small text-muted">{{ acct.account_type }} &middot; {{ acct.category }}</div>
+                {% if row.balance != 0 %}
+                <div class="small fw-bold text-coop mt-1">Balance: ₱{{ '{:,.2f}'.format(row.balance) }}</div>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-muted">No accounts match this filter.</p>
+            {% endfor %}
+        </div>
+        <div class="desktop-table table-responsive">
+            <table class="table table-sm table-hover" id="accountsTable">
+                <thead class="table-success">
+                    <tr><th>Code</th><th>Account Name</th><th>Type</th><th>Category</th><th class="text-end">Balance</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in account_rows %}
+                    {% set acct = row.account %}
+                    <tr data-search="{{ acct.code }} {{ acct.name }} {{ acct.account_type }} {{ acct.category }}">
+                        <td><code>{{ acct.code }}</code></td>
+                        <td>{{ acct.name }}</td>
+                        <td><span class="badge bg-secondary">{{ acct.account_type }}</span></td>
+                        <td class="small">{{ acct.category }}</td>
+                        <td class="text-end fw-bold">{% if row.balance != 0 %}₱{{ '{:,.2f}'.format(row.balance) }}{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script>
+    document.getElementById('accountSearch').addEventListener('input', e => {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('#accountsTable tbody tr, .account-card').forEach(el => {
+            el.style.display = !q || el.dataset.search.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{% extends "documentation/_doc_base.html" %}
+{% block doc_content %}
+<p class="small">Annex A-3 Part VIII — Backup Procedure and Disaster Recovery Plan</p>
+
+<div class="alert alert-light border small">
+    Records retained for <strong>{{ retention_years }} years</strong> pursuant to RR No. 17-2013,
+    as amended by RR No. 5-2014.
+</div>
+
+<h6 class="fw-bold">Backup Procedures</h6>
+<ol class="small">
+    {% for step in backup_procedures %}
+    <li class="mb-1">{{ step }}</li>
+    {% endfor %}
+</ol>
+
+<h6 class="fw-bold mt-4">Restoration Procedures</h6>
+<ol class="small">
+    {% for step in restoration_procedures %}
+    <li class="mb-1">{{ step }}</li>
+    {% endfor %}
+</ol>
+
+<h6 class="fw-bold mt-4">Implementation Mapping</h6>
+<table class="table table-sm feature-map">
+    <thead><tr><th>Control</th><th>CoopBooks Implementation</th></tr></thead>
+    <tbody>
+        {% for row in feature_mapping %}
+        <tr><td>{{ row.control }}</td><td>{{ row.implementation }}</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p class="small text-muted mt-3">
+    <strong>Physical location of backup media:</strong> {{ physical_location }}
+</p>
+{% endblock %}

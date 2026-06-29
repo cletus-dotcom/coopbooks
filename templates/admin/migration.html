@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Migration Tool — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        .step-card { border-left: 4px solid var(--coop-green, #1B5E20); }
+        .template-row:hover { background: #f8fbf8; }
+        .order-badge {
+            width: 1.75rem; height: 1.75rem; border-radius: 50%;
+            background: #1B5E20; color: #fff; font-size: 0.75rem;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-weight: 700;
+        }
+        #previewPanel { display: none; }
+        .flow-diagram {
+            display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;
+            font-size: 0.75rem; color: #64748b;
+        }
+        .flow-diagram .arrow { color: #94a3b8; }
+    </style>
+</head>
+<body>
+{% set page_title = "Migration Tool" %}
+{% set active_nav = "migration" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card welcome-card mb-3">
+        <h4 class="mb-1"><i class="bi bi-database-down"></i> Cooperative Data Migration Tool</h4>
+        <p class="mb-0">
+            Download Excel templates, paste legacy data from your old system, then upload into the
+            selected cooperative&rsquo;s isolated database.
+        </p>
+    </div>
+
+    {% if import_results is defined %}
+    <div class="dashboard-card mb-3">
+        <h6 class="fw-bold text-coop">Import Results — <code>{{ selected_coop }}</code></h6>
+        <p class="small text-muted">
+            Mode: <strong>{{ import_mode }}</strong> ·
+            {{ total_imported }} row(s) imported ·
+            {{ total_errors }} error(s)
+        </p>
+        {% for result in import_results %}
+        <div class="border rounded p-2 mb-2">
+            <div class="fw-semibold">{{ result.table }}</div>
+            <div class="small">
+                Imported: {{ result.imported }} · Skipped: {{ result.skipped }}
+                {% if result.errors %}
+                <ul class="text-danger mb-0 mt-1">
+                    {% for err in result.errors[:10] %}
+                    <li>{{ err }}</li>
+                    {% endfor %}
+                    {% if result.errors|length > 10 %}
+                    <li>… and {{ result.errors|length - 10 }} more</li>
+                    {% endif %}
+                </ul>
+                {% else %}
+                <span class="text-success">OK</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="dashboard-card step-card h-100">
+                <h6 class="fw-bold text-coop">Step 1 — Download Templates</h6>
+                <p class="small text-muted">
+                    Each file contains column headers matching the tenant database tables.
+                    Copy-paste your data starting at <strong>row 2</strong>. Keep headers unchanged.
+                </p>
+                <div class="flow-diagram mb-3">
+                    {% for t in migration_tables %}
+                    <span>{{ t.order }}. {{ t.label.split()[0] }}</span>
+                    {% if not loop.last %}<span class="arrow">→</span>{% endif %}
+                    {% endfor %}
+                </div>
+                <a href="{{ url_for('main_routes.admin_migration_templates_zip') }}" class="btn btn-coop btn-sm mb-3">
+                    <i class="bi bi-file-zip"></i> Download All (.zip)
+                </a>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-success">
+                            <tr><th></th><th>Template</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            {% for t in migration_tables %}
+                            <tr class="template-row">
+                                <td><span class="order-badge">{{ t.order }}</span></td>
+                                <td>
+                                    <div class="fw-semibold small">{{ t.label }}</div>
+                                    <div class="text-muted" style="font-size:0.7rem">{{ t.filename }}</div>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('main_routes.admin_migration_template', table_key=t.key) }}"
+                                       class="btn btn-outline-success btn-sm py-0 px-2">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="dashboard-card step-card mb-3">
+                <h6 class="fw-bold text-coop">Step 2 — Select Cooperative</h6>
+                <form id="migrationForm" method="post" action="{{ url_for('main_routes.admin_migration_import') }}" enctype="multipart/form-data">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Cooperative Code</label>
+                            <select name="coop_slug" id="coop_slug" class="form-select form-select-sm" required>
+                                <option value="">— Select coop —</option>
+                                {% for c in coops %}
+                                <option value="{{ c.slug }}" {% if selected_coop == c.slug %}selected{% endif %}>
+                                    {{ c.slug }} — {{ c.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Import Mode</label>
+                            <select name="import_mode" class="form-select form-select-sm">
+                                <option value="append" {% if import_mode != 'replace' %}selected{% endif %}>
+                                    Append — skip existing records
+                                </option>
+                                <option value="replace" {% if import_mode == 'replace' %}selected{% endif %}>
+                                    Replace — clear table data before import
+                                </option>
+                            </select>
+                            <div class="form-text">Replace applies per uploaded table only.</div>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-coop">Step 3 — Upload Filled Templates</h6>
+                    <p class="small text-muted mb-2">
+                        Upload files in any order; the system imports in dependency order automatically.
+                    </p>
+                    <div class="row g-2">
+                        {% for t in migration_tables %}
+                        <div class="col-md-6">
+                            <label class="form-label small mb-0">{{ t.order }}. {{ t.label }}</label>
+                            <input type="file" name="{{ t.key }}" class="form-control form-control-sm migration-file"
+                                   accept=".xlsx,.xls">
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <button type="button" id="previewBtn" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-eye"></i> Validate / Preview
+                        </button>
+                        <button type="submit" class="btn btn-coop btn-sm" id="importBtn">
+                            <i class="bi bi-cloud-upload"></i> Import to Database
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="dashboard-card" id="previewPanel">
+                <h6 class="fw-bold text-coop">Validation Preview</h6>
+                <div id="previewContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <h6 class="fw-bold">Design Notes</h6>
+        <div class="row g-3 small text-muted">
+            <div class="col-md-4">
+                <strong class="text-dark">Copy-paste workflow</strong>
+                <p class="mb-0">Coops export from Excel/Legacy systems, paste into templates, and upload without manual SQL.</p>
+            </div>
+            <div class="col-md-4">
+                <strong class="text-dark">Foreign keys as codes</strong>
+                <p class="mb-0">Use <code>member_no</code>, <code>account_code</code>, and <code>entry_no</code> instead of database IDs.</p>
+            </div>
+            <div class="col-md-4">
+                <strong class="text-dark">Per-coop isolation</strong>
+                <p class="mb-0">Each cooperative code routes imports to that coop&rsquo;s dedicated PostgreSQL database.</p>
+            </div>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script>
+document.getElementById('previewBtn')?.addEventListener('click', async () => {
+    const form = document.getElementById('migrationForm');
+    const coop = document.getElementById('coop_slug').value;
+    if (!coop) { alert('Select a cooperative code first.'); return; }
+
+    const fd = new FormData(form);
+    const res = await fetch('{{ url_for("main_routes.admin_migration_preview") }}', { method: 'POST', body: fd });
+    const data = await res.json();
+    const panel = document.getElementById('previewPanel');
+    const content = document.getElementById('previewContent');
+
+    if (data.status !== 'success') {
+        content.innerHTML = `<div class="alert alert-warning py-2 small">${data.msg}</div>`;
+        panel.style.display = 'block';
+        return;
+    }
+
+    let html = '';
+    for (const p of data.previews) {
+        const ok = p.errors.length === 0;
+        html += `<div class="border rounded p-2 mb-2">
+            <div class="fw-semibold">${p.label} <span class="badge ${ok ? 'text-bg-success' : 'text-bg-danger'}">${p.row_count} rows</span></div>
+            <div class="small text-muted">${p.filename}</div>`;
+        if (p.errors.length) {
+            html += '<ul class="small text-danger mb-0">' + p.errors.slice(0, 5).map(e => `<li>${e}</li>`).join('') + '</ul>';
+        } else if (p.warnings && p.warnings.length) {
+            html += '<ul class="small text-warning mb-0">' + p.warnings.slice(0, 3).map(w => `<li>${w}</li>`).join('') + '</ul>';
+            html += '<div class="small text-muted">FK warnings clear after earlier tables are imported.</div>';
+        }
+        html += '</div>';
+    }
+    content.innerHTML = html;
+    panel.style.display = 'block';
+});
+
+document.getElementById('importBtn')?.addEventListener('click', e => {
+    const mode = document.querySelector('[name=import_mode]').value;
+    if (mode === 'replace' && !confirm('Replace mode will delete existing data in uploaded tables. Continue?')) {
+        e.preventDefault();
+    }
+});
+</script>
+</body>
+</html>

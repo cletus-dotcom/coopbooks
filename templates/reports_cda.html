@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CDA Reports — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "CDA Reports" %}
+{% set active_nav = "reports" %}
+{% set report_section = "cda" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <h5 class="text-coop fw-bold mb-3">Financial Reports (CDA MC 2022-24)</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <a href="{{ url_for('main_routes.report_sfc') }}" class="text-decoration-none">
+                    <div class="border rounded p-3 h-100">
+                        <div class="fw-bold text-coop">Annex A — Statement of Financial Condition</div>
+                        <p class="small text-muted mb-0">Assets, liabilities, and members&rsquo; equity as prescribed by CDA.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6">
+                <a href="{{ url_for('main_routes.report_operations') }}" class="text-decoration-none">
+                    <div class="border rounded p-3 h-100">
+                        <div class="fw-bold text-coop">Annex B — Statement of Operations</div>
+                        <p class="small text-muted mb-0">Revenue, expenses, and net surplus for allocation.</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <h6 class="fw-bold">Official CDA Templates</h6>
+        <ul class="small mb-0">
+            {% for form in cda_report_forms %}
+            <li class="mb-2"><strong>{{ form.code }}</strong> — {{ form.title }}
+                <a href="{{ form.url }}" target="_blank" rel="noopener">Download <i class="bi bi-box-arrow-up-right"></i></a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

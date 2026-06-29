@@ -1,0 +1,32 @@
+{% extends "documentation/_doc_base.html" %}
+{% block doc_content %}
+<h6 class="fw-bold mt-3">Annex A-3 Part I — Software/System Description</h6>
+<table class="table table-sm feature-map">
+    <tbody>
+        {% for row in feature_mapping %}
+        <tr>
+            <td>{{ row.field }}</td>
+            <td>{{ row.value }}</td>
+            <td class="small text-muted">{{ row.source }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h6 class="fw-bold mt-4">Technical Infrastructure</h6>
+<table class="table table-sm">
+    <tr><td>Application Stack</td><td>{{ tech_stack }}</td></tr>
+    <tr><td>Database</td><td>{{ database_platform }}</td></tr>
+    <tr><td>Python Runtime</td><td>{{ python_version }}</td></tr>
+    <tr><td>Server Platform</td><td>{{ os_platform }}</td></tr>
+    <tr><td>Release Date</td><td>{{ system_release }}</td></tr>
+</table>
+
+{% if coop %}
+<p class="small text-muted mt-3">
+    Cooperative: <strong>{{ coop.name }}</strong>
+    {% if coop.registration_no %} · CDA Reg. {{ coop.registration_no }}{% endif %}
+    {% if coop.address %} · {{ coop.address }}{% endif %}
+</p>
+{% endif %}
+{% endblock %}

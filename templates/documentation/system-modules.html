@@ -1,0 +1,27 @@
+{% extends "documentation/_doc_base.html" %}
+{% block doc_content %}
+<p class="small">Annex A-3 Part III — List of Modules per software/system</p>
+<div class="table-responsive">
+    <table class="table table-sm table-hover">
+        <thead class="table-success">
+            <tr><th>Module</th><th>Description</th><th>Route</th><th>BIR Classification</th></tr>
+        </thead>
+        <tbody>
+            {% for m in modules %}
+            <tr>
+                <td class="fw-semibold">{{ m.name }}</td>
+                <td class="small">{{ m.description }}</td>
+                <td><code>{{ m.route }}</code></td>
+                <td class="small">{{ m.bir_module }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="stats-grid mt-3">
+    <div class="stat-tile"><div class="stat-value">{{ stats.accounts }}</div><div class="stat-label">Accounts</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ stats.journal_entries }}</div><div class="stat-label">Journal Entries</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ stats.members }}</div><div class="stat-label">Members</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ stats.users }}</div><div class="stat-label">System Users</div></div>
+</div>
+{% endblock %}

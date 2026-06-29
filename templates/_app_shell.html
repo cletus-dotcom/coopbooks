@@ -1,0 +1,363 @@
+{# Shared mobile-first app shell for authenticated pages #}
+<style>
+    :root {
+        --coop-green: {{ coop_green }};
+        --coop-green-dark: {{ coop_green_dark }};
+        --coop-green-light: {{ coop_green_light }};
+        --sidebar-bg: #0D3B12;
+        --sidebar-width: 260px;
+        --topbar-height: 60px;
+    }
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    body { background: linear-gradient(165deg, #f8fbf8 0%, #e8f5e9 100%); }
+    body.no-scroll { overflow: hidden; }
+    body.sidebar-open::before {
+        content: ""; position: fixed; inset: 0;
+        background: rgba(0,0,0,0.4); z-index: 1100;
+    }
+    .bg-coop { background-color: var(--coop-green) !important; }
+    .text-coop { color: var(--coop-green); }
+    .btn-coop { background: var(--coop-green); border-color: var(--coop-green); color: #fff; }
+    .btn-coop:hover { background: var(--coop-green-dark); border-color: var(--coop-green-dark); color: #fff; }
+
+    .topbar {
+        position: fixed; top: 0; left: 0; right: 0;
+        height: var(--topbar-height); background: var(--coop-green);
+        color: #fff; display: flex; align-items: center; gap: 0.75rem;
+        padding: 0 1rem; z-index: 1300;
+        box-shadow: 0 2px 12px rgba(13, 59, 18, 0.25);
+    }
+    .btn-menu {
+        background: transparent; border: none; color: #fff;
+        font-size: 1.35rem; padding: 0.25rem 0.5rem; border-radius: 8px;
+    }
+    .btn-menu:hover { background: rgba(255,255,255,0.12); }
+    .topbar-title { font-weight: 700; font-size: 1rem; white-space: nowrap; }
+    .topbar-actions { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+    .user-chip {
+        display: flex; align-items: center; gap: 0.5rem;
+        background: rgba(255,255,255,0.12); border-radius: 999px;
+        padding: 0.25rem 0.75rem 0.25rem 0.35rem; font-size: 0.75rem;
+    }
+    .user-avatar {
+        width: 28px; height: 28px; border-radius: 50%;
+        background: #fff; color: var(--coop-green);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 0.7rem;
+    }
+
+    .sidebar {
+        position: fixed; top: var(--topbar-height); left: 0; bottom: 0;
+        width: var(--sidebar-width); background: var(--sidebar-bg);
+        color: #fff; transform: translateX(-110%);
+        transition: transform 250ms ease; z-index: 1200;
+        overflow-y: auto; display: flex; flex-direction: column;
+        padding: 1rem 0.75rem;
+    }
+    .sidebar.visible { transform: translateX(0); }
+    .sidebar-label {
+        font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; color: rgba(255,255,255,0.45);
+        padding: 0.5rem 0.75rem 0.35rem;
+    }
+    .sidebar-nav { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+    .sidebar-nav a {
+        display: flex; align-items: center; gap: 0.65rem;
+        padding: 0.65rem 0.75rem; border-radius: 8px;
+        color: rgba(255,255,255,0.85); text-decoration: none;
+        font-size: 0.9rem; font-weight: 500;
+    }
+    .sidebar-nav a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .sidebar-nav a.active {
+        background: linear-gradient(135deg, var(--coop-green-light) 0%, var(--coop-green) 100%);
+        color: #fff; font-weight: 600;
+    }
+    .sidebar-nav a i { font-size: 1.1rem; width: 1.25rem; text-align: center; }
+    .sidebar-nav button.sidebar-link {
+        display: flex; align-items: center; gap: 0.65rem;
+        width: 100%; padding: 0.65rem 0.75rem; border: none; border-radius: 8px;
+        color: rgba(255,255,255,0.85); font-size: 0.9rem; font-weight: 500;
+        background: transparent; text-align: left;
+    }
+    .sidebar-nav button.sidebar-link:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .sidebar-divider {
+        border: none; border-top: 1px solid rgba(255,255,255,0.12);
+        margin: 0.75rem 0.5rem;
+    }
+    #adminSubMenu,
+    #docSubMenu,
+    #aboutSubMenu,
+    #reportsSubMenu { padding-left: 0.5rem; }
+    #adminSubMenu .sidebar-sublink,
+    #docSubMenu .sidebar-sublink,
+    #aboutSubMenu .sidebar-sublink,
+    #reportsSubMenu .sidebar-sublink {
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+        color: rgba(255,255,255,0.75); text-decoration: none;
+        font-size: 0.85rem; border-radius: 6px; width: 100%;
+        border: none; background: transparent; text-align: left;
+    }
+    #adminSubMenu .sidebar-sublink:hover,
+    #adminSubMenu .sidebar-sublink.active,
+    #docSubMenu .sidebar-sublink:hover,
+    #docSubMenu .sidebar-sublink.active,
+    #aboutSubMenu .sidebar-sublink:hover,
+    #aboutSubMenu .sidebar-sublink.active,
+    #reportsSubMenu .sidebar-sublink:hover,
+    #reportsSubMenu .sidebar-sublink.active {
+        background: rgba(46, 125, 50, 0.35); color: #fff;
+    }
+    .sidebar-footer { margin-top: auto; text-align: center; padding-top: 1.5rem; }
+    .sidebar-logo { max-width: 64px; opacity: 0.75; }
+
+    .main-content {
+        margin-top: var(--topbar-height);
+        padding: 1.25rem 1rem 2rem;
+        min-height: calc(100vh - var(--topbar-height));
+    }
+    .dashboard-card {
+        background: #fff; border-radius: 14px;
+        box-shadow: 0 2px 12px rgba(27, 94, 32, 0.08);
+        border: 1px solid rgba(27, 94, 32, 0.06);
+        padding: 1.25rem; margin-bottom: 1.25rem;
+    }
+    .welcome-card {
+        background: linear-gradient(135deg, var(--coop-green-dark) 0%, var(--coop-green) 55%, var(--coop-green-light) 100%);
+        color: #fff;
+    }
+    .welcome-card h4 { font-weight: 700; margin: 0 0 0.35rem; }
+    .welcome-card p { margin: 0; opacity: 0.92; font-size: 0.9rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    @media (min-width: 768px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
+    .stat-tile {
+        background: linear-gradient(165deg, #f8fbf8 0%, #eef7ee 100%);
+        border: 1px solid rgba(27, 94, 32, 0.08);
+        border-radius: 12px; padding: 0.9rem 1rem; text-align: center;
+    }
+    .stat-tile .stat-value { font-size: 1.35rem; font-weight: 800; color: var(--coop-green); }
+    .stat-tile .stat-label {
+        font-size: 0.68rem; color: #64748b; margin-top: 0.25rem;
+        font-weight: 600; text-transform: uppercase;
+    }
+    .mobile-cards { display: block; }
+    .desktop-table { display: none; }
+    @media (min-width: 768px) {
+        .mobile-cards { display: none; }
+        .desktop-table { display: block; }
+        .main-content { padding: 1.5rem; }
+    }
+    @media (min-width: 992px) {
+        body.sidebar-open::before { display: none; }
+        .sidebar { transform: translateX(0); }
+        .main-content { margin-left: var(--sidebar-width); }
+        .btn-menu { display: none; }
+    }
+    @media (max-width: 575px) { .topbar-title { display: none; } }
+</style>
+
+<header class="topbar">
+    <button class="btn-menu" id="menuToggle" aria-label="Toggle menu"><i class="bi bi-list"></i></button>
+    <span class="topbar-title">{{ page_title or "CoopBooks" }}{% if session.get('coop_name') %} · {{ session.coop_name }}{% endif %}</span>
+    <div class="topbar-actions">
+        <div class="user-chip">
+            <span class="user-avatar">{{ fullname[:1]|upper if fullname else 'U' }}</span>
+            <span><strong>{{ role|capitalize }}</strong></span>
+        </div>
+    </div>
+</header>
+
+<aside id="sidebar" class="sidebar">
+    {% if is_platform_admin %}
+    <p class="sidebar-label">Platform</p>
+    <ul class="sidebar-nav">
+        <li><a href="{{ url_for('main_routes.admin_coops') }}" class="{{ 'active' if active_nav == 'coops' else '' }}"><i class="bi bi-building"></i> Coop Registry</a></li>
+        <li><a href="{{ url_for('main_routes.admin_coops_register') }}" class="{{ 'active' if active_nav == 'coops_register' else '' }}"><i class="bi bi-plus-circle"></i> Register Coop</a></li>
+        <li><a href="{{ url_for('main_routes.admin_migration') }}" class="{{ 'active' if active_nav == 'migration' else '' }}"><i class="bi bi-database-down"></i> Migration Tool</a></li>
+    </ul>
+    {% else %}
+    <p class="sidebar-label">Accounting</p>
+    <ul class="sidebar-nav">
+        {% if 'dashboard' in subscribed_modules %}
+        <li><a href="{{ url_for('main_routes.dashboard') }}" class="{{ 'active' if active_nav == 'dashboard' else '' }}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        {% endif %}
+        {% if 'journal' in subscribed_modules %}
+        <li><a href="{{ url_for('main_routes.journal_list') }}" class="{{ 'active' if active_nav == 'journal' else '' }}"><i class="bi bi-journal-text"></i> General Journal</a></li>
+        {% endif %}
+        {% if 'accounts' in subscribed_modules %}
+        <li><a href="{{ url_for('main_routes.accounts') }}" class="{{ 'active' if active_nav == 'accounts' else '' }}"><i class="bi bi-list-columns"></i> Chart of Accounts</a></li>
+        {% endif %}
+        {% if 'members' in subscribed_modules %}
+        <li><a href="{{ url_for('main_routes.members') }}" class="{{ 'active' if active_nav == 'members' else '' }}"><i class="bi bi-people"></i> Members</a></li>
+        {% endif %}
+        {% if 'reports' in subscribed_modules %}
+        <li>
+            <button class="sidebar-link" id="reportsOptionsBtn" type="button">
+                <i class="bi bi-file-earmark-bar-graph"></i> Reports
+                <i class="bi bi-chevron-down ms-auto" id="reportsChevron" style="font-size:0.75rem;"></i>
+            </button>
+        </li>
+        {% endif %}
+        {% if 'bir_cas' in subscribed_modules %}
+        <li>
+            <button class="sidebar-link" id="docOptionsBtn" type="button">
+                <i class="bi bi-folder2-open"></i> BIR CAS Docs
+                <i class="bi bi-chevron-down ms-auto" id="docChevron" style="font-size:0.75rem;"></i>
+            </button>
+        </li>
+        {% endif %}
+    </ul>
+    {% if 'reports' in subscribed_modules %}
+    <div id="reportsSubMenu" class="{{ '' if active_nav == 'reports' else 'd-none' }}">
+        <a href="{{ url_for('main_routes.reports_bir_books') }}"
+           class="sidebar-sublink {{ 'active' if report_section == 'bir-books' else '' }}">
+            <i class="bi bi-journals"></i> BIR Books of Accounts
+        </a>
+        <a href="{{ url_for('main_routes.reports_cda') }}"
+           class="sidebar-sublink {{ 'active' if report_section == 'cda' else '' }}">
+            <i class="bi bi-file-earmark-text"></i> CDA Reports
+        </a>
+    </div>
+    {% endif %}
+    {% if 'bir_cas' in subscribed_modules %}
+    <div id="docSubMenu" class="{{ '' if active_nav == 'documentation' else 'd-none' }}">
+        <a href="{{ url_for('main_routes.documentation_index') }}"
+           class="sidebar-sublink {{ 'active' if active_nav == 'documentation' and not doc_slug else '' }}">
+            <i class="bi bi-list-check"></i> Overview &amp; Checklist
+        </a>
+        {% for req in bir_cas_requirements %}
+        <a href="{{ url_for('main_routes.documentation_view', slug=req.slug) }}"
+           class="sidebar-sublink {{ 'active' if doc_slug == req.slug else '' }}">
+            <i class="bi {{ req.icon }}"></i> {{ req.number }}. {{ req.short_title }}
+        </a>
+        {% endfor %}
+        <a href="{{ url_for('main_routes.documentation_audit_trail') }}" class="sidebar-sublink">
+            <i class="bi bi-clock-history"></i> Audit Trail
+        </a>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if not is_platform_admin %}
+    <hr class="sidebar-divider">
+    <p class="sidebar-label">About</p>
+    <ul class="sidebar-nav">
+        <li>
+            <button class="sidebar-link" id="aboutOptionsBtn" type="button">
+                <i class="bi bi-info-circle"></i> About
+                <i class="bi bi-chevron-down ms-auto" id="aboutChevron" style="font-size:0.75rem;"></i>
+            </button>
+        </li>
+    </ul>
+    <div id="aboutSubMenu" class="{{ '' if active_nav == 'about' else 'd-none' }}">
+        <a href="{{ url_for('main_routes.about_user_manual') }}"
+           class="sidebar-sublink {{ 'active' if about_slug == 'user-manual' else '' }}">
+            <i class="bi bi-book"></i> User Manual
+        </a>
+    </div>
+    {% endif %}
+
+    {% if is_admin_role(session.get('role')) and not is_platform_admin %}
+    <hr class="sidebar-divider">
+    <p class="sidebar-label">Administration</p>
+    <ul class="sidebar-nav">
+        <li>
+            <button class="sidebar-link" id="adminOptionsBtn" type="button">
+                <i class="bi bi-gear"></i> Admin Options
+                <i class="bi bi-chevron-down ms-auto" id="adminChevron" style="font-size:0.75rem;"></i>
+            </button>
+        </li>
+    </ul>
+    <div id="adminSubMenu" class="{{ '' if active_nav in ('users', 'coops') else 'd-none' }}">
+        {% if 'admin_users' in subscribed_modules %}
+        <a href="{{ url_for('main_routes.admin_users') }}"
+           class="sidebar-sublink {{ 'active' if active_nav == 'users' else '' }}">
+            <i class="bi bi-person-gear"></i> User Management
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <hr class="sidebar-divider">
+    <ul class="sidebar-nav">
+        <li><a href="{{ url_for('main_routes.index') }}"><i class="bi bi-house"></i> Home</a></li>
+        <li><a href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <img src="{{ coop_logo_url }}" alt="CoopBooks" class="sidebar-logo">
+        <div class="text-white-50 small mt-2">&copy; {{ session.get('coop_name') or 'CoopBooks' }}</div>
+    </div>
+</aside>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const body = document.body;
+    const isDesktop = () => window.matchMedia('(min-width: 992px)').matches;
+    function closeSidebar() {
+        if (isDesktop()) return;
+        sidebar.classList.remove('visible');
+        body.classList.remove('no-scroll', 'sidebar-open');
+    }
+    menuToggle?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (isDesktop()) return;
+        const isOpen = sidebar.classList.toggle('visible');
+        body.classList.toggle('no-scroll', isOpen);
+        body.classList.toggle('sidebar-open', isOpen);
+    });
+    document.addEventListener('click', e => {
+        if (isDesktop()) return;
+        if (!sidebar.contains(e.target) && !menuToggle?.contains(e.target)) closeSidebar();
+    });
+
+    const adminBtn = document.getElementById('adminOptionsBtn');
+    const adminSub = document.getElementById('adminSubMenu');
+    const adminChevron = document.getElementById('adminChevron');
+    adminBtn?.addEventListener('click', e => {
+        e.stopPropagation();
+        adminSub?.classList.toggle('d-none');
+        if (adminChevron) {
+            adminChevron.classList.toggle('bi-chevron-down');
+            adminChevron.classList.toggle('bi-chevron-up');
+        }
+    });
+
+    const reportsBtn = document.getElementById('reportsOptionsBtn');
+    const reportsSub = document.getElementById('reportsSubMenu');
+    const reportsChevron = document.getElementById('reportsChevron');
+    reportsBtn?.addEventListener('click', e => {
+        e.stopPropagation();
+        reportsSub?.classList.toggle('d-none');
+        if (reportsChevron) {
+            reportsChevron.classList.toggle('bi-chevron-down');
+            reportsChevron.classList.toggle('bi-chevron-up');
+        }
+    });
+
+    const docBtn = document.getElementById('docOptionsBtn');
+    const docSub = document.getElementById('docSubMenu');
+    const docChevron = document.getElementById('docChevron');
+    docBtn?.addEventListener('click', e => {
+        e.stopPropagation();
+        docSub?.classList.toggle('d-none');
+        if (docChevron) {
+            docChevron.classList.toggle('bi-chevron-down');
+            docChevron.classList.toggle('bi-chevron-up');
+        }
+    });
+
+    const aboutBtn = document.getElementById('aboutOptionsBtn');
+    const aboutSub = document.getElementById('aboutSubMenu');
+    const aboutChevron = document.getElementById('aboutChevron');
+    aboutBtn?.addEventListener('click', e => {
+        e.stopPropagation();
+        aboutSub?.classList.toggle('d-none');
+        if (aboutChevron) {
+            aboutChevron.classList.toggle('bi-chevron-down');
+            aboutChevron.classList.toggle('bi-chevron-up');
+        }
+    });
+});
+</script>

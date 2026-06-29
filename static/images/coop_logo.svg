@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Cooperative logo">
+  <circle cx="60" cy="60" r="58" fill="#1B5E20"/>
+  <circle cx="60" cy="60" r="48" fill="#2E7D32"/>
+  <g fill="#F9A825">
+    <circle cx="60" cy="38" r="10"/>
+    <circle cx="38" cy="62" r="10"/>
+    <circle cx="82" cy="62" r="10"/>
+    <circle cx="48" cy="84" r="10"/>
+    <circle cx="72" cy="84" r="10"/>
+  </g>
+  <path d="M60 48 L38 62 L48 84 L72 84 L82 62 Z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+</svg>

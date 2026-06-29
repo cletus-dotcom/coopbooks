@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="icon" href="{{ url_for('static', filename='images/coop_logo.svg') }}">
+    <style>
+        .overview-tabs .nav-link {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #475569;
+            border: none;
+            border-bottom: 2px solid transparent;
+            border-radius: 0;
+            padding: 0.55rem 0.85rem;
+        }
+        .overview-tabs .nav-link.active {
+            color: var(--coop-green);
+            background: transparent;
+            border-bottom-color: var(--coop-green);
+        }
+        .stat-tile-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+            border-radius: 12px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .stat-tile-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(27, 94, 32, 0.14);
+            color: inherit;
+        }
+        .stat-tile-link .stat-tile { height: 100%; position: relative; }
+        .stat-tile-link .stat-icon {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            font-size: 1.1rem;
+            color: var(--coop-green);
+            opacity: 0.35;
+        }
+        .stat-tile-link .stat-detail {
+            font-size: 0.65rem;
+            color: #64748b;
+            margin-top: 0.35rem;
+        }
+        .chart-wrap {
+            position: relative;
+            height: 280px;
+        }
+        @media (min-width: 768px) { .chart-wrap { height: 320px; } }
+        .columnar-section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--coop-green);
+            margin: 1rem 0 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .columnar-section-title:first-child { margin-top: 0; }
+        .columnar-head {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr 0.7fr 0.9fr;
+            gap: 0.5rem;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            padding: 0.5rem 0.75rem;
+            background: #f1f8f1;
+            border-radius: 8px 8px 0 0;
+        }
+        .columnar-row {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr 0.7fr 0.9fr;
+            gap: 0.5rem;
+            align-items: center;
+            padding: 0.75rem;
+            border-bottom: 1px solid rgba(27, 94, 32, 0.08);
+            text-decoration: none;
+            color: inherit;
+            transition: background 0.12s ease;
+        }
+        .columnar-row:hover { background: #f8fbf8; color: inherit; }
+        .columnar-row .indicator { font-weight: 600; font-size: 0.85rem; }
+        .columnar-row .subtitle { font-size: 0.72rem; color: #64748b; margin-top: 0.1rem; }
+        .columnar-row .amount { font-weight: 700; color: var(--coop-green); font-size: 0.9rem; }
+        .columnar-row .pct {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #475569;
+        }
+        .columnar-row .activity { font-size: 0.72rem; color: #64748b; }
+        .columnar-row .activity.up { color: #2E7D32; }
+        .columnar-row .activity.down { color: #C62828; }
+        .columnar-card { border: 1px solid rgba(27, 94, 32, 0.1); border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+        .columnar-mobile {
+            display: block;
+        }
+        .columnar-desktop { display: none; }
+        @media (min-width: 768px) {
+            .columnar-mobile { display: none; }
+            .columnar-desktop { display: block; }
+        }
+        .col-mobile-card {
+            border: 1px solid rgba(27, 94, 32, 0.1);
+            border-radius: 10px;
+            padding: 0.85rem;
+            margin-bottom: 0.65rem;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .col-mobile-card:hover { background: #f8fbf8; color: inherit; }
+        .trend-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem 1rem;
+            margin-top: 0.75rem;
+            font-size: 0.72rem;
+            color: #64748b;
+        }
+        .trend-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+        .trend-legend i {
+            display: inline-block;
+            width: 18px;
+            height: 3px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+{% set page_title = "Dashboard" %}
+{% set active_nav = "dashboard" %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card welcome-card">
+        <h4>Welcome, {{ fullname }}!</h4>
+        <p>{{ coop.name if coop else "Philippine Cooperative" }} — CDA-Compliant Accounting Dashboard</p>
+    </div>
+
+    <div class="dashboard-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h5 class="text-coop fw-bold mb-0">Financial Overview</h5>
+            <span class="small text-muted" id="overviewPeriod"></span>
+        </div>
+
+        <ul class="nav overview-tabs border-bottom mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="trends-tab" data-bs-toggle="tab" data-bs-target="#trendsPane" type="button" role="tab">
+                    <i class="bi bi-graph-up"></i> Trends
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="columnar-tab" data-bs-toggle="tab" data-bs-target="#columnarPane" type="button" role="tab">
+                    <i class="bi bi-layout-three-columns"></i> Columnar
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="cards-tab" data-bs-toggle="tab" data-bs-target="#cardsPane" type="button" role="tab">
+                    <i class="bi bi-grid"></i> Cards
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- Trends: bar chart -->
+            <div class="tab-pane fade show active" id="trendsPane" role="tabpanel">
+                <p class="small text-muted mb-2">Monthly transaction flow by category — useful for spotting seasonal patterns in cash, savings, loans, and revenue.</p>
+                <div class="chart-wrap">
+                    <canvas id="trendsChart" aria-label="Financial trends line chart"></canvas>
+                </div>
+                <div class="trend-legend" id="trendLegend"></div>
+            </div>
+
+            <!-- Columnar: CDA-style multi-column layout -->
+            <div class="tab-pane fade" id="columnarPane" role="tabpanel">
+                <p class="small text-muted mb-2">Columnar analysis — indicator, amount, share of total assets, and month-over-month activity. Tap a row for details.</p>
+                <div id="columnarContent"></div>
+            </div>
+
+            <!-- Cards: clickable stat tiles -->
+            <div class="tab-pane fade" id="cardsPane" role="tabpanel">
+                <p class="small text-muted mb-2">Tap any card to open the detailed page.</p>
+                <div class="stats-grid" id="cardsGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h5 class="text-coop fw-bold mb-0"><i class="bi bi-journal-text"></i> Recent Journal Entries</h5>
+            {% if can_post %}
+            <a href="{{ url_for('main_routes.journal_new') }}" class="btn btn-coop btn-sm"><i class="bi bi-plus-circle"></i> New Entry</a>
+            {% endif %}
+        </div>
+        <div class="mobile-cards" id="journalMobile"></div>
+        <div class="desktop-table table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="table-success">
+                    <tr>
+                        <th>Entry #</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Lines</th>
+                    </tr>
+                </thead>
+                <tbody id="journalTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <h5 class="text-coop fw-bold mb-3"><i class="bi bi-shield-check"></i> CDA Compliance Reminders</h5>
+        <ul class="mb-0 small text-muted">
+            <li class="mb-2">Submit <strong>Cooperative Annual Progress Report (CAPR)</strong> with audited financial statements within 120 days after year-end.</li>
+            <li class="mb-2">Use <strong>Annex A</strong> (Statement of Financial Condition) and <strong>Annex B</strong> (Statement of Operations) per MC 2022-24.</li>
+            <li>Statutory allocations: Reserve Fund, CETF, Community Development Fund, and Optional Fund from net surplus.</li>
+        </ul>
+    </div>
+</main>
+
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    const peso = n => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtValue = (value, format) => format === 'currency' ? peso(value) : Number(value).toLocaleString('en-PH');
+
+    let trendsChart = null;
+
+    function renderCards(cards) {
+        document.getElementById('cardsGrid').innerHTML = cards.map(card => `
+            <a href="${card.url}" class="stat-tile-link">
+                <div class="stat-tile">
+                    <i class="bi ${card.icon} stat-icon"></i>
+                    <div class="stat-value">${fmtValue(card.value, card.format)}</div>
+                    <div class="stat-label">${card.label}</div>
+                    <div class="stat-detail">${card.detail} <i class="bi bi-chevron-right"></i></div>
+                </div>
+            </a>`).join('');
+    }
+
+    function renderTrends(trends) {
+        const ctx = document.getElementById('trendsChart');
+        if (trendsChart) trendsChart.destroy();
+
+        trendsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: trends.labels,
+                datasets: trends.datasets.map(ds => ({
+                    label: ds.label,
+                    data: ds.data,
+                    borderColor: ds.borderColor,
+                    backgroundColor: ds.backgroundColor + '33',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: ds.borderColor,
+                })),
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${peso(ctx.raw)}`,
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            font: { size: 11 },
+                            callback: v => '₱' + Number(v).toLocaleString('en-PH'),
+                        },
+                    },
+                },
+            },
+        });
+
+        document.getElementById('trendLegend').innerHTML = trends.datasets.map(ds =>
+            `<span><i style="background:${ds.borderColor}"></i>${ds.label}</span>`
+        ).join('');
+    }
+
+    function activityClass(text) {
+        if (text.startsWith('↑')) return 'up';
+        if (text.startsWith('↓')) return 'down';
+        return '';
+    }
+
+    function renderColumnar(data) {
+        const container = document.getElementById('columnarContent');
+        document.getElementById('overviewPeriod').textContent =
+            `Period: ${data.period_label} · Total Assets: ${peso(data.total_assets)}`;
+
+        container.innerHTML = data.sections.map(section => `
+            <div class="columnar-section-title"><i class="bi ${section.icon}"></i> ${section.title}</div>
+            <div class="columnar-card columnar-desktop">
+                <div class="columnar-head">
+                    <span>Indicator</span>
+                    <span>Amount</span>
+                    <span>% Assets</span>
+                    <span>Activity</span>
+                </div>
+                ${section.rows.map(row => `
+                    <a href="${row.url}" class="columnar-row">
+                        <div>
+                            <div class="indicator">${row.indicator}</div>
+                            <div class="subtitle">${row.subtitle}</div>
+                        </div>
+                        <div class="amount">${fmtValue(row.amount, row.format)}</div>
+                        <div class="pct">${row.pct != null ? row.pct + '%' : '—'}</div>
+                        <div class="activity ${activityClass(row.activity)}">${row.activity}</div>
+                    </a>`).join('')}
+            </div>
+            <div class="columnar-mobile">
+                ${section.rows.map(row => `
+                    <a href="${row.url}" class="col-mobile-card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-bold">${row.indicator}</div>
+                                <div class="small text-muted">${row.subtitle}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold text-coop">${fmtValue(row.amount, row.format)}</div>
+                                ${row.pct != null ? `<div class="small">${row.pct}% of assets</div>` : ''}
+                            </div>
+                        </div>
+                        <div class="small mt-1 ${activityClass(row.activity)}">${row.activity}</div>
+                    </a>`).join('')}
+            </div>`).join('');
+    }
+
+    function renderJournals(journals) {
+        const table = document.getElementById('journalTable');
+        const mobile = document.getElementById('journalMobile');
+        if (!journals.length) {
+            table.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No journal entries yet</td></tr>';
+            mobile.innerHTML = '<p class="text-muted text-center py-2">No journal entries yet</p>';
+            return;
+        }
+        table.innerHTML = journals.map(j => `
+            <tr style="cursor:pointer" onclick="location.href='/journal/${j.entry_no}'">
+                <td><strong>${j.entry_no}</strong></td>
+                <td>${j.entry_date}</td>
+                <td>${j.description || '—'}</td>
+                <td>${peso(j.total_debit)}</td>
+                <td>${j.line_count}</td>
+            </tr>`).join('');
+        mobile.innerHTML = journals.map(j => `
+            <div class="border rounded p-3 mb-2" style="cursor:pointer" onclick="location.href='/journal/${j.entry_no}'">
+                <div class="fw-bold text-coop">${j.entry_no}</div>
+                <div class="small text-muted">${j.entry_date} &middot; ${peso(j.total_debit)}</div>
+                <div class="small">${j.description || '—'}</div>
+            </div>`).join('');
+    }
+
+    async function loadDashboard() {
+        const [statsRes, trendsRes, columnarRes, journalsRes] = await Promise.all([
+            fetch('/api/dashboard_stats'),
+            fetch('/api/dashboard_trends'),
+            fetch('/api/dashboard_columnar'),
+            fetch('/api/recent_journals'),
+        ]);
+        const stats = await statsRes.json();
+        const trends = await trendsRes.json();
+        const columnar = await columnarRes.json();
+        const journals = await journalsRes.json();
+
+        renderCards(stats.cards);
+        renderTrends(trends);
+        renderColumnar(columnar);
+        renderJournals(journals);
+    }
+
+    loadDashboard();
+
+    document.getElementById('trends-tab').addEventListener('shown.bs.tab', () => {
+        if (trendsChart) trendsChart.resize();
+    });
+</script>
+</body>
+</html>

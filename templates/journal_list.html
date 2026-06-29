@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>General Journal — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "General Journal" %}
+{% set active_nav = "journal" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h5 class="text-coop fw-bold mb-0">Journal Entries</h5>
+            {% if can_post %}
+            <a href="{{ url_for('main_routes.journal_new') }}" class="btn btn-coop btn-sm"><i class="bi bi-plus-circle"></i> New Entry</a>
+            {% endif %}
+        </div>
+        <div class="mobile-cards">
+            {% for e in entries %}
+            <a href="{{ url_for('main_routes.journal_detail', entry_no=e.entry_no) }}" class="text-decoration-none text-dark">
+                <div class="border rounded p-3 mb-2">
+                    <div class="fw-bold text-coop">{{ e.entry_no }}</div>
+                    <div class="small text-muted">{{ e.entry_date }} &middot; {{ e.posted_by or '—' }}</div>
+                    <div class="small">{{ e.description or '—' }}</div>
+                </div>
+            </a>
+            {% else %}
+            <p class="text-muted">No journal entries yet.</p>
+            {% endfor %}
+        </div>
+        <div class="desktop-table table-responsive">
+            <table class="table table-hover table-sm">
+                <thead class="table-success">
+                    <tr><th>Entry #</th><th>Date</th><th>Description</th><th>Reference</th><th>Posted By</th></tr>
+                </thead>
+                <tbody>
+                    {% for e in entries %}
+                    <tr style="cursor:pointer" onclick="location.href='{{ url_for('main_routes.journal_detail', entry_no=e.entry_no) }}'">
+                        <td><strong>{{ e.entry_no }}</strong></td>
+                        <td>{{ e.entry_date }}</td>
+                        <td>{{ e.description or '—' }}</td>
+                        <td>{{ e.reference or '—' }}</td>
+                        <td>{{ e.posted_by or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

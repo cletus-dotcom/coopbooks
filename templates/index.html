@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}CoopBooks — CDA-Compliant Cooperative Accounting{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { background: #f4f8f4; color: #1e293b; }
+    .landing { min-height: 100vh; display: flex; flex-direction: column; }
+
+    .hero {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(165deg, #ffffff 0%, #e8f5e9 42%, #c8e6c9 100%);
+        padding: 2rem 1.25rem 3.5rem;
+        text-align: center;
+    }
+    .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(ellipse 70% 50% at 50% -10%, rgba(27, 94, 32, 0.08) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 30% at 90% 80%, rgba(249, 168, 37, 0.06) 0%, transparent 60%);
+        pointer-events: none;
+    }
+    .hero-inner { position: relative; max-width: 860px; margin: 0 auto; }
+    .hero-brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 1.5rem; }
+    .logo-wrap {
+        width: 110px; height: 110px; margin-bottom: 0.65rem;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
+    .hero-subtitle {
+        font-size: clamp(0.85rem, 2.5vw, 1rem);
+        font-weight: 700; color: var(--coop-green);
+        letter-spacing: 0.06em; text-transform: uppercase; margin: 0;
+    }
+    .hero h1 {
+        font-size: clamp(1.35rem, 4.5vw, 2.1rem);
+        font-weight: 800; color: var(--coop-green-dark);
+        line-height: 1.25; margin: 0 0 1rem;
+    }
+    .hero .sub-headline {
+        font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+        color: #475569; line-height: 1.65;
+        max-width: 640px; margin: 0 auto 2rem;
+    }
+    .cda-badge {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: rgba(249, 168, 37, 0.15); color: #8D6E00;
+        font-size: 0.75rem; font-weight: 700; padding: 0.35rem 0.85rem;
+        border-radius: 999px; margin-bottom: 1.5rem;
+    }
+    .cta-label {
+        font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.1em; color: #64748b; margin-bottom: 1rem;
+    }
+    .cta-grid {
+        display: grid; grid-template-columns: 1fr;
+        gap: 0.85rem; max-width: 520px; margin: 0 auto;
+    }
+    .feature-link {
+        display: flex; align-items: center; gap: 1rem;
+        padding: 1rem 1.2rem; border-radius: 14px;
+        text-decoration: none; color: #fff;
+        background: linear-gradient(135deg, var(--coop-green-light) 0%, var(--coop-green) 100%);
+        box-shadow: 0 4px 18px rgba(27, 94, 32, 0.22);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        text-align: left;
+    }
+    .feature-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 28px rgba(27, 94, 32, 0.32);
+        color: #fff;
+    }
+    .feature-link .icon-circle {
+        width: 44px; height: 44px; border-radius: 11px;
+        background: rgba(255,255,255,0.2);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.35rem; flex-shrink: 0;
+    }
+    .feature-link .text-block h2 { font-size: 0.95rem; font-weight: 700; margin: 0 0 0.1rem; }
+    .feature-link .text-block p { font-size: 0.78rem; margin: 0; opacity: 0.9; line-height: 1.35; }
+    .feature-link .arrow { margin-left: auto; font-size: 1.1rem; opacity: 0.75; flex-shrink: 0; }
+
+    .content-section { padding: 3rem 1.25rem; }
+    .content-section:nth-child(even) { background: #fff; }
+    .content-section:nth-child(odd) { background: #f4f8f4; }
+    .section-inner { max-width: 820px; margin: 0 auto; }
+    .section-tag {
+        display: inline-block; font-size: 0.68rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.1em;
+        color: var(--coop-green-light); margin-bottom: 0.5rem;
+    }
+    .section-headline {
+        font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+        font-weight: 800; color: var(--coop-green-dark);
+        margin: 0 0 1.5rem; line-height: 1.3;
+    }
+    .info-cards { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    .info-card {
+        background: #fff; border-radius: 14px;
+        border: 1px solid rgba(27, 94, 32, 0.09);
+        padding: 1.25rem 1.35rem;
+        box-shadow: 0 2px 12px rgba(27, 94, 32, 0.05);
+    }
+    .content-section:nth-child(even) .info-card { background: #f8fbf8; }
+    .info-card .card-icon {
+        width: 40px; height: 40px; border-radius: 10px;
+        background: rgba(27, 94, 32, 0.08); color: var(--coop-green);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem; margin-bottom: 0.75rem;
+    }
+    .info-card h3 { font-size: 0.95rem; font-weight: 700; color: var(--coop-green-dark); margin: 0 0 0.45rem; }
+    .info-card p { font-size: 0.875rem; color: #475569; line-height: 1.65; margin: 0; }
+    .report-list { list-style: none; padding: 0; margin: 0; }
+    .report-list li {
+        display: flex; align-items: flex-start; gap: 0.75rem;
+        padding: 0.85rem 0; border-bottom: 1px solid rgba(27,94,32,0.08);
+        font-size: 0.875rem;
+    }
+    .report-list li:last-child { border-bottom: none; }
+    .report-list .code {
+        font-weight: 700; color: var(--coop-green); min-width: 4.5rem;
+    }
+    .landing-footer {
+        text-align: center; font-size: 0.75rem;
+        padding: 1.5rem 1rem; background: var(--coop-green-dark);
+        color: rgba(255,255,255,0.55);
+    }
+
+    @media (min-width: 576px) {
+        .hero { padding: 2.5rem 2rem 4rem; }
+        .content-section { padding: 3.5rem 2rem; }
+    }
+    @media (min-width: 640px) {
+        .info-cards { grid-template-columns: 1fr 1fr; }
+        .info-card.span-full { grid-column: 1 / -1; }
+    }
+    @media (min-width: 768px) {
+        .cta-grid { grid-template-columns: repeat(3, 1fr); max-width: 900px; gap: 1rem; }
+        .feature-link { flex-direction: column; align-items: flex-start; padding: 1.25rem 1.1rem; height: 100%; }
+        .feature-link .arrow { margin-left: 0; margin-top: auto; align-self: flex-end; }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="landing">
+    <header class="hero">
+        <div class="hero-inner">
+            <div class="hero-brand">
+                <div class="logo-wrap">
+                    <img src="{{ url_for('static', filename='images/coop_logo.svg') }}" alt="CoopBooks Logo">
+                </div>
+                <p class="hero-subtitle">Philippine Cooperative Accounting</p>
+            </div>
+            <div class="cda-badge"><i class="bi bi-shield-check"></i> Based on CDA MC 2022-24</div>
+            <h1>CoopBooks — Accounting Built for Philippine Cooperatives</h1>
+            <p class="sub-headline">
+                Mobile-first bookkeeping aligned with the Cooperative Development Authority (CDA)
+                Revised Standard Chart of Accounts and mandatory report forms.
+            </p>
+
+            <p class="cta-label">Get Started</p>
+            <div class="cta-grid">
+                <a href="{{ url_for('main_routes.login', next='/dashboard') }}" class="feature-link">
+                    <span class="icon-circle"><i class="bi bi-speedometer2"></i></span>
+                    <span class="text-block">
+                        <h2>Dashboard</h2>
+                        <p>Financial overview, members &amp; journal activity</p>
+                    </span>
+                    <span class="arrow"><i class="bi bi-chevron-right"></i></span>
+                </a>
+                <a href="{{ url_for('main_routes.login', next='/journal') }}" class="feature-link">
+                    <span class="icon-circle"><i class="bi bi-journal-text"></i></span>
+                    <span class="text-block">
+                        <h2>General Journal</h2>
+                        <p>Double-entry transactions per CDA accounts</p>
+                    </span>
+                    <span class="arrow"><i class="bi bi-chevron-right"></i></span>
+                </a>
+                <a href="{{ url_for('main_routes.login', next='/members') }}" class="feature-link">
+                    <span class="icon-circle"><i class="bi bi-people"></i></span>
+                    <span class="text-block">
+                        <h2>Members</h2>
+                        <p>Member registry, share capital &amp; savings</p>
+                    </span>
+                    <span class="arrow"><i class="bi bi-chevron-right"></i></span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <section class="content-section">
+        <div class="section-inner">
+            <span class="section-tag">CDA Compliance</span>
+            <h2 class="section-headline">Aligned with Cooperative Development Authority Standards</h2>
+            <div class="info-cards">
+                <div class="info-card">
+                    <div class="card-icon"><i class="bi bi-list-columns"></i></div>
+                    <h3>Revised Chart of Accounts</h3>
+                    <p>Account codes follow CDA Memorandum Circular 2022-24 — covering assets, deposit liabilities, members&rsquo; equity, statutory funds, and cooperative revenue/expense categories.</p>
+                </div>
+                <div class="info-card">
+                    <div class="card-icon"><i class="bi bi-people"></i></div>
+                    <h3>Members &amp; Share Capital</h3>
+                    <p>Track member registry, paid-up share capital, and savings deposits — core to cooperative financial reporting under Philippine law.</p>
+                </div>
+                <div class="info-card span-full">
+                    <div class="card-icon"><i class="bi bi-calendar-check"></i></div>
+                    <h3>Annual Reporting Reminder</h3>
+                    <p>Cooperatives must submit CAPR with audited financial statements to CDA within 120 days after fiscal year-end (typically by April 30). Reports include Annex A (Statement of Financial Condition), Annex B (Statement of Operations), and Annex E (Statement of Cash Flows).</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-inner">
+            <span class="section-tag">Standard Report Forms</span>
+            <h2 class="section-headline">CDA Cooperative Standard Report Forms</h2>
+            <ul class="report-list">
+                {% for form in cda_report_forms %}
+                <li>
+                    <span class="code">{{ form.code }}</span>
+                    <span>
+                        <strong>{{ form.title }}</strong><br>
+                        <small class="text-muted">{{ form.source }}</small>
+                        <a href="{{ form.url }}" target="_blank" rel="noopener" class="ms-1 small">View template <i class="bi bi-box-arrow-up-right"></i></a>
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-inner">
+            <span class="section-tag">Features</span>
+            <h2 class="section-headline">Built for Treasurers &amp; Bookkeepers</h2>
+            <div class="info-cards">
+                <div class="info-card">
+                    <div class="card-icon"><i class="bi bi-phone"></i></div>
+                    <h3>Mobile-First Design</h3>
+                    <p>Review balances, post journal entries, and check member accounts from any device — optimized for field work and board meetings.</p>
+                </div>
+                <div class="info-card">
+                    <div class="card-icon"><i class="bi bi-calculator"></i></div>
+                    <h3>Double-Entry Bookkeeping</h3>
+                    <p>Every transaction balanced across CDA account codes — loans receivable, deposit liabilities, statutory funds, and patronage allocations.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="landing-footer">
+        &copy; {{ 2026 }} CoopBooks &mdash; Philippine Cooperative Accounting System.
+        Reference: <a href="https://cda.gov.ph/downloads/cooperative-standard-report-forms/" style="color:rgba(255,255,255,0.7)">CDA Standard Report Forms</a>
+    </footer>
+</div>
+{% endblock %}

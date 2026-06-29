@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cooperative Registry — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+{% set page_title = "Coop Registry" %}
+{% set active_nav = "coops" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h5 class="text-coop fw-bold mb-0">Registered Cooperatives</h5>
+                <p class="small text-muted mb-0">Platform administration — separate database per coop</p>
+            </div>
+            <a href="{{ url_for('main_routes.admin_coops_register') }}" class="btn btn-coop btn-sm">
+                <i class="bi bi-plus-circle"></i> Register Coop
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead class="table-success">
+                    <tr>
+                        <th>Code</th><th>Name</th><th>Database</th><th>Status</th><th>Modules</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for coop in coops %}
+                    <tr>
+                        <td><code>{{ coop.slug }}</code></td>
+                        <td>
+                            {% if coop.logo_filename %}
+                            <img src="{{ url_for('main_routes.coop_logo', slug=coop.slug, filename=coop.logo_filename) }}" alt="" style="height:24px;width:24px;object-fit:contain" class="me-1">
+                            {% endif %}
+                            {{ coop.name }}
+                        </td>
+                        <td class="small text-muted">{{ coop.db_name }}</td>
+                        <td>
+                            <span class="badge {% if coop.status == 'Active' %}text-bg-success{% elif coop.status == 'Suspended' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+                                {{ coop.status }}
+                            </span>
+                        </td>
+                        <td class="small">
+                            {% for key, spec in app_modules.items() %}
+                            {% if module_map[coop.id].get(key) %}
+                            <span class="badge text-bg-light border me-1">{{ spec.label }}</span>
+                            {% endif %}
+                            {% endfor %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('main_routes.admin_coop_detail', slug=coop.slug) }}" class="btn btn-outline-success btn-sm">Manage</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-muted">No cooperatives registered yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

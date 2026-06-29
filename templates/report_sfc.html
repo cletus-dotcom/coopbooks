@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Statement of Financial Condition — CoopBooks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>@media print { .topbar, .sidebar, .no-print { display: none !important; } .main-content { margin: 0 !important; padding: 0 !important; } }</style>
+</head>
+<body>
+{% set page_title = "Annex A" %}
+{% set active_nav = "reports" %}
+{% set report_section = "cda" %}
+{% set fullname = session.get('fullname', 'User') %}
+{% set role = session.get('role', 'Member') %}
+{% include "_app_shell.html" %}
+
+<main class="main-content">
+    <div class="dashboard-card">
+        <div class="no-print mb-3">
+            <a href="{{ url_for('main_routes.reports_cda') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> Back to Reports</a>
+            <button onclick="window.print()" class="btn btn-coop btn-sm float-end"><i class="bi bi-printer"></i> Print</button>
+        </div>
+        <div class="text-center mb-4">
+            <h5 class="fw-bold mb-1">{{ coop.name if coop else "NAME OF COOPERATIVE" }}</h5>
+            <h6 class="text-coop">STATEMENT OF FINANCIAL CONDITION</h6>
+            <p class="small text-muted mb-0">As of {{ as_of.strftime('%B %d, %Y') }} — CDA MC 2022-24 Annex A</p>
+        </div>
+
+        {% for section_name, label, total_key in [
+            ('Asset', 'ASSETS', 'total_assets'),
+            ('Liability', 'LIABILITIES', 'total_liabilities'),
+            ('Equity', "MEMBERS' EQUITY", 'total_equity')
+        ] %}
+        <h6 class="fw-bold mt-3">{{ label }}</h6>
+        <table class="table table-sm">
+            <tbody>
+                {% for row in report.sections[section_name] %}
+                <tr>
+                    <td class="ps-3"><code class="small">{{ row.code }}</code> {{ row.name }}</td>
+                    <td class="text-end" style="width:140px">₱{{ '{:,.2f}'.format(row.amount) }}</td>
+                </tr>
+                {% else %}
+                <tr><td class="text-muted ps-3">No balances</td><td></td></tr>
+                {% endfor %}
+                <tr class="fw-bold table-light">
+                    <td>TOTAL {{ label }}</td>
+                    <td class="text-end">₱{{ '{:,.2f}'.format(report[total_key]) }}</td>
+                </tr>
+            </tbody>
+        </table>
+        {% endfor %}
+
+        <table class="table table-sm mt-3">
+            <tr class="fw-bold table-success">
+                <td>TOTAL LIABILITIES AND MEMBERS' EQUITY</td>
+                <td class="text-end" style="width:140px">₱{{ '{:,.2f}'.format(report.total_liabilities + report.total_equity) }}</td>
+            </tr>
+        </table>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

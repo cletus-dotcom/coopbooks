@@ -1,0 +1,72 @@
+{% extends "documentation/_doc_base.html" %}
+{% block doc_content %}
+<h6 class="fw-bold">User Access Levels (Annex B Item 11)</h6>
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead class="table-success">
+            <tr><th>Role</th><th>Can Post</th><th>Admin</th><th>Restrictions</th></tr>
+        </thead>
+        <tbody>
+            {% for r in roles %}
+            <tr>
+                <td><strong>{{ r.role }}</strong></td>
+                <td>{% if r.can_post %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-muted"></i>{% endif %}</td>
+                <td>{% if r.is_admin %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                <td class="small">{{ r.restrictions }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<h6 class="fw-bold mt-4">Security Controls</h6>
+<ul class="small">
+    {% for c in security_controls %}
+    <li class="mb-1">{{ c }}</li>
+    {% endfor %}
+</ul>
+
+<h6 class="fw-bold mt-4">Annex B Compliance Matrix</h6>
+<table class="table table-sm">
+    <tbody>
+        {% for item in annex_b_compliance %}
+        <tr>
+            <td>{{ item.item }}</td>
+            <td>{% if item.compliant %}<span class="badge text-bg-success">Compliant</span>{% else %}<span class="badge text-bg-warning">Pending</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="d-flex flex-wrap gap-2 mt-3">
+    <a href="{{ url_for('main_routes.documentation_audit_trail') }}" class="btn btn-coop btn-sm">
+        <i class="bi bi-clock-history"></i> Full Audit Trail ({{ audit_total }} records)
+    </a>
+    <a href="{{ url_for('main_routes.documentation_book_pdf', book_type='audit-trail') }}" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-pdf"></i> Print Audit Trail
+    </a>
+    <a href="{{ url_for('main_routes.admin_users') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-person-gear"></i> User Management
+    </a>
+</div>
+
+{% if recent_audit %}
+<h6 class="fw-bold mt-4">Recent Activity</h6>
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead><tr><th>Date/Time</th><th>User</th><th>Action</th><th>Entity</th><th>Description</th></tr></thead>
+        <tbody>
+            {% for row in recent_audit %}
+            <tr>
+                <td class="small">{{ row.created_at }}</td>
+                <td>{{ row.username }}</td>
+                <td><span class="badge text-bg-light border">{{ row.action }}</span></td>
+                <td>{{ row.entity_type }}</td>
+                <td class="small">{{ row.entity_label }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
