@@ -3,6 +3,16 @@ name = "coopbooks"
 version = "0.1.0"
 description = "CDA-compliant cooperative accounting for Philippine coops"
 requires-python = ">=3.11"
+dependencies = [
+    "Flask==3.1.2",
+    "flask-cors==6.0.1",
+    "Flask-SQLAlchemy==3.1.1",
+    "psycopg2-binary==2.9.11",
+    "python-dotenv==1.2.1",
+    "pytz==2025.2",
+    "reportlab==4.4.2",
+    "openpyxl==3.1.5",
+]
 
 [tool.vercel]
-entrypoint = "run:app"
+entrypoint = "wsgi:app"

@@ -1,13 +1,11 @@
 import os
 import socket
 
-from waitress import serve
-
-from app import create_app
-
-app = create_app()
+from wsgi import app
 
 if __name__ == "__main__":
+    from waitress import serve
+
     try:
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
