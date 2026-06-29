@@ -1,20 +1,67 @@
 import os
+from urllib.parse import quote, unquote, urlparse, urlunparse
+
+
+def _env(*names, default=None):
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return default
+
 
 DB_CONFIG = {
-    "db_user": os.getenv("DB_USER", "postgres"),
-    "db_pass": os.getenv("DB_PASS", "password"),
-    "db_ip": os.getenv("DB_IP", "127.0.0.1"),
-    "db_port": os.getenv("DB_PORT", "5432"),
-    "db_name": os.getenv("DB_NAME", "coop_accounting"),
-    "platform_db_name": os.getenv("PLATFORM_DB_NAME", "coop_platform"),
+    "db_user": _env("DB_USER", "POSTGRES_USER", default="postgres"),
+    "db_pass": _env("DB_PASS", "POSTGRES_PASSWORD", default="password"),
+    "db_ip": _env("DB_IP", "DB_HOST", "POSTGRES_HOST", default="127.0.0.1"),
+    "db_port": _env("DB_PORT", "POSTGRES_PORT", default="5432"),
+    "db_name": _env("DB_NAME", default="coop_accounting"),
+    "platform_db_name": _env("PLATFORM_DB_NAME", default="coop_platform"),
 }
 
 
+def is_serverless_host():
+    return bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+
+
+def _normalize_sqlalchemy_uri(url):
+    if not url:
+        return url
+    if url.startswith("postgres://"):
+        url = "postgresql+psycopg2://" + url[len("postgres://") :]
+    elif url.startswith("postgresql://") and "+psycopg2" not in url:
+        url = "postgresql+psycopg2://" + url[len("postgresql://") :]
+    return url
+
+
+def _uri_with_db_name(uri, db_name):
+    parsed = urlparse(uri.replace("postgresql+psycopg2://", "postgresql://", 1))
+    safe_name = quote(unquote(db_name), safe="")
+    return urlunparse(parsed._replace(path=f"/{safe_name}")).replace(
+        "postgresql://", "postgresql+psycopg2://", 1
+    )
+
+
 def build_database_uri(db_name=None):
-    name = db_name or DB_CONFIG["db_name"]
+    target = db_name or DB_CONFIG["db_name"]
+    platform_name = DB_CONFIG["platform_db_name"]
+    tenant_url = os.getenv("DATABASE_URL")
+    platform_url = os.getenv("PLATFORM_DATABASE_URL")
+
+    if platform_url and target == platform_name:
+        return _normalize_sqlalchemy_uri(platform_url)
+    if tenant_url and not platform_url:
+        # Single hosted DB (e.g. Supabase): platform + tenant tables share one database.
+        return _normalize_sqlalchemy_uri(tenant_url)
+    if tenant_url and target == DB_CONFIG["db_name"]:
+        return _normalize_sqlalchemy_uri(tenant_url)
+    if tenant_url and target == platform_name:
+        return _uri_with_db_name(_normalize_sqlalchemy_uri(tenant_url), platform_name)
+
     return (
-        f"postgresql+psycopg2://{DB_CONFIG['db_user']}:{DB_CONFIG['db_pass']}@"
-        f"{DB_CONFIG['db_ip']}:{DB_CONFIG['db_port']}/{name}"
+        f"postgresql+psycopg2://{quote(DB_CONFIG['db_user'], safe='')}:"
+        f"{quote(DB_CONFIG['db_pass'], safe='')}@"
+        f"{DB_CONFIG['db_ip']}:{DB_CONFIG['db_port']}/{quote(target, safe='')}"
     )
 
 

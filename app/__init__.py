@@ -21,6 +21,7 @@ from app.config import (
     can_post_entries,
     is_admin_role,
     is_platform_admin_session,
+    is_serverless_host,
 )
 from app.bir_cas_config import BIR_CAS_REQUIREMENTS, SYSTEM_NAME, SYSTEM_VERSION
 from app.modules_config import APP_MODULES, nav_modules
@@ -104,38 +105,50 @@ def create_app():
 
 def _bootstrap_databases():
     """Initialize platform registry and default tenant."""
-    from sqlalchemy import create_engine, text
-
-    from app.platform_models import PlatformUser
-    from app.tenant_provisioning import migrate_legacy_single_tenant
-    from app.tenant_manager import switch_tenant_bind
     from werkzeug.security import generate_password_hash
 
-    _ensure_platform_database_exists()
-
-    db.create_all()
-    migrate_legacy_single_tenant()
-    _write_static_migration_templates()
-
-    if PlatformUser.query.filter_by(username="PlatformAdmin").first() is None:
-        admin = PlatformUser(
-            username="PlatformAdmin",
-            full_name="Platform Administrator",
-            email="platform@coopbooks.local",
-            status="Active",
-            password_hash=generate_password_hash("platform123"),
-        )
-        db.session.add(admin)
-        db.session.commit()
+    from app.platform_models import PlatformUser
+    from app.tenant_manager import switch_tenant_bind
+    from app.tenant_provisioning import migrate_legacy_single_tenant
 
     try:
-        switch_tenant_bind("demo")
+        if not is_serverless_host():
+            _ensure_platform_database_exists()
+        else:
+            log.info("Skipping PostgreSQL CREATE DATABASE on serverless host")
+
         db.create_all()
-        _ensure_tenant_columns()
-        from app.services import seed_tenant_database
-        seed_tenant_database()
+        migrate_legacy_single_tenant()
+
+        if not is_serverless_host():
+            _write_static_migration_templates()
+
+        if PlatformUser.query.filter_by(username="PlatformAdmin").first() is None:
+            admin = PlatformUser(
+                username="PlatformAdmin",
+                full_name="Platform Administrator",
+                email="platform@coopbooks.local",
+                status="Active",
+                password_hash=generate_password_hash("platform123"),
+            )
+            db.session.add(admin)
+            db.session.commit()
+
+        try:
+            switch_tenant_bind("demo")
+            db.create_all()
+            _ensure_tenant_columns()
+            from app.services import seed_tenant_database
+            seed_tenant_database()
+        except Exception as exc:
+            log.warning("Tenant bootstrap skipped: %s", exc)
     except Exception as exc:
-        log.warning("Tenant bootstrap skipped: %s", exc)
+        log.error("Database bootstrap failed: %s", exc)
+        if is_serverless_host() and not os.getenv("DATABASE_URL") and not os.getenv("DB_IP"):
+            log.error(
+                "Vercel: set DATABASE_URL to your hosted Postgres connection string "
+                "(Supabase, Neon, etc.) in Project Settings → Environment Variables."
+            )
 
 
 def _write_static_migration_templates():
