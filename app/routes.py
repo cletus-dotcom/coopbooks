@@ -71,7 +71,10 @@ register_route_guards(main_routes)
 
 @main_routes.route("/")
 def index():
-    coops = list_active_coops()
+    try:
+        coops = list_active_coops()
+    except Exception:
+        coops = []
     return render_template("index.html", coops=coops)
 
 

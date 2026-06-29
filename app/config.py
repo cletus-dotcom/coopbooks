@@ -42,11 +42,26 @@ def _uri_with_db_name(uri, db_name):
     )
 
 
+def _effective_database_url():
+    """Prefer pooler URL on Vercel/serverless (required for Supabase)."""
+    pooler = os.getenv("DATABASE_POOLER_URL")
+    direct = os.getenv("DATABASE_URL")
+    if is_serverless_host() and pooler:
+        return pooler
+    if is_serverless_host() and direct and "db." in direct and ".supabase.co" in direct:
+        import logging
+        logging.getLogger(__name__).warning(
+            "DATABASE_URL uses Supabase direct host (db.*.supabase.co). "
+            "Vercel requires the Supabase pooler URL on port 6543 — set DATABASE_POOLER_URL."
+        )
+    return direct
+
+
 def build_database_uri(db_name=None):
     target = db_name or DB_CONFIG["db_name"]
     platform_name = DB_CONFIG["platform_db_name"]
-    tenant_url = os.getenv("DATABASE_URL")
-    platform_url = os.getenv("PLATFORM_DATABASE_URL")
+    tenant_url = _effective_database_url()
+    platform_url = os.getenv("PLATFORM_DATABASE_URL") or os.getenv("PLATFORM_DATABASE_POOLER_URL")
 
     if platform_url and target == platform_name:
         return _normalize_sqlalchemy_uri(platform_url)
@@ -63,6 +78,20 @@ def build_database_uri(db_name=None):
         f"{quote(DB_CONFIG['db_pass'], safe='')}@"
         f"{DB_CONFIG['db_ip']}:{DB_CONFIG['db_port']}/{quote(target, safe='')}"
     )
+
+
+def sqlalchemy_engine_options():
+    """Serverless-friendly pool settings."""
+    opts = {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
+    }
+    if is_serverless_host():
+        opts.update({
+            "pool_size": 1,
+            "max_overflow": 0,
+        })
+    return opts
 
 
 def is_platform_admin_session(session_obj):

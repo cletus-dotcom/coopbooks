@@ -22,6 +22,7 @@ from app.config import (
     is_admin_role,
     is_platform_admin_session,
     is_serverless_host,
+    sqlalchemy_engine_options,
 )
 from app.bir_cas_config import BIR_CAS_REQUIREMENTS, SYSTEM_NAME, SYSTEM_VERSION
 from app.modules_config import APP_MODULES, nav_modules
@@ -51,6 +52,7 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = platform_uri
     app.config["SQLALCHEMY_BINDS"] = {TENANT_BIND: tenant_uri}
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = sqlalchemy_engine_options()
     app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
 
     db.init_app(app)
@@ -85,7 +87,7 @@ def create_app():
     @app.route("/favicon.ico")
     def favicon():
         return send_from_directory(
-            os.path.join(app.root_path, "static", "images"),
+            os.path.join(app.static_folder, "images"),
             "coop_logo.svg",
             mimetype="image/svg+xml",
         )
