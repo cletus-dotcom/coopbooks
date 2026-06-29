@@ -16,10 +16,10 @@
 
 <main class="main-content">
     <div class="dashboard-card mb-3">
-        <a href="{{ url_for('main_routes.admin_coops') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> Coop Registry</a>
+        <a href="{{ url_for('main_routes.admin_coops') }}" class="small text-coop"><i class="bi bi-arrow-left"></i> Cooperative Settings</a>
         <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
-            {% if coop.logo_filename %}
-            <img src="{{ url_for('main_routes.coop_logo', slug=coop.slug, filename=coop.logo_filename) }}" alt="Logo" style="height:64px;max-width:120px;object-fit:contain">
+            {% if coop.logo_data %}
+            <img src="{{ url_for('main_routes.coop_logo') }}" alt="Logo" style="height:64px;max-width:120px;object-fit:contain">
             {% endif %}
             <div>
                 <h5 class="text-coop fw-bold mb-0">{{ coop.name }}</h5>

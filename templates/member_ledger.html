@@ -57,7 +57,12 @@
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mt-2 mb-3">
             <div>
                 <h5 class="text-coop fw-bold mb-1"><i class="bi bi-journal-bookmark"></i> {{ member.full_name }}</h5>
-                <div class="small text-muted"><code>{{ member.member_no }}</code> &middot; Member Transaction Ledger</div>
+                <div class="small text-muted">
+                    <code>{{ member.member_no }}</code>
+                    {% if member.tin %} &middot; TIN {{ member.tin }}{% endif %}
+                    {% if member.membership_type %} &middot; {{ member.membership_type }}{% endif %}
+                    &middot; Member Transaction Ledger
+                </div>
             </div>
             {% if can_post %}
             <button type="button" class="btn btn-coop btn-sm" data-bs-toggle="modal" data-bs-target="#addTxnModal">
@@ -173,14 +178,14 @@
 </main>
 
 {% if can_post %}
-<div class="modal fade" id="addTxnModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade" id="addTxnModal" tabindex="-1" aria-labelledby="addTxnModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-coop text-white">
-                <h5 class="modal-title">Record Transaction</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="{{ url_for('main_routes.member_ledger_add', member_no=member.member_no) }}">
+            <form method="POST" action="{{ url_for('main_routes.member_ledger_add', member_no=member.member_no) }}" class="modal-form-scroll">
+                <div class="modal-header bg-coop text-white">
+                    <h5 class="modal-title" id="addTxnModalLabel">Record Transaction</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">

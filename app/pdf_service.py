@@ -2,6 +2,7 @@
 
 import io
 import re
+from io import BytesIO
 from pathlib import Path
 
 from flask import g
@@ -27,7 +28,7 @@ from app.accounting_service import (
 from app.bir_cas_config import SYSTEM_NAME, SYSTEM_VERSION
 from app.bir_cas_service import pdf_data_for_slug
 from app.models import local_time
-from app.tenant_manager import UPLOAD_ROOT, get_current_coop, get_registry_from_session
+from app.tenant_manager import get_coop_registry, get_current_coop
 
 BIR_BOOK_TYPES = frozenset({
     "general-journal",
@@ -173,17 +174,14 @@ def _book_top_margin(header_ctx, left_margin=0.75 * inch, right_margin=0.75 * in
 
 
 def _active_registry():
-    registry = get_registry_from_session()
-    if registry is None and hasattr(g, "coop_registry"):
-        return g.coop_registry
-    return registry
+    return get_coop_registry()
 
 
 def _resolve_logo_path(registry):
-    if registry and registry.logo_filename:
-        path = UPLOAD_ROOT / registry.slug / registry.logo_filename
-        if path.is_file() and path.suffix.lower() in RASTER_LOGO_EXTENSIONS:
-            return path
+    if registry and registry.logo_data:
+        ext = (registry.logo_filename or "").rsplit(".", 1)[-1].lower()
+        if ext in RASTER_LOGO_EXTENSIONS or ext == "svg":
+            return BytesIO(registry.logo_data)
     return None
 
 
@@ -256,8 +254,10 @@ def _draw_bir_book_header(canvas, doc, header_ctx):
     if logo_path:
         logo_h = min(0.58 * inch, _header_row_count(header_ctx, center_wrap) * (HEADER_LINE_HEIGHT / 72.0 * inch))
         try:
+            from reportlab.lib.utils import ImageReader
+
             canvas.drawImage(
-                str(logo_path),
+                ImageReader(logo_path),
                 left,
                 header_top,
                 width=max_logo_w,

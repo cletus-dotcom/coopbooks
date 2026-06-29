@@ -12,6 +12,8 @@ venv/
 
 # Environment / secrets
 .env
+.env.*
+!.env.example
 
 # IDE / OS
 .vscode/

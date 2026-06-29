@@ -1,0 +1,152 @@
+{# CDA MC 2012-16 — add-member form fields (used inside modal-body) #}
+<p class="small text-muted mb-3">
+    Fields follow CDA Memorandum Circular No. 2012-16 minimum membership registry information.
+</p>
+
+<h6 class="text-coop fw-bold small text-uppercase mb-2">A–C. Registry Information</h6>
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <label class="form-label">Membership No. (B) <span class="text-danger">*</span></label>
+        <input type="text" name="member_no" class="form-control" value="{{ next_member_no }}" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">TIN (C) <span class="text-danger">*</span></label>
+        <input type="text" name="tin" class="form-control" placeholder="123-456-789-000" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Register Entry Date</label>
+        <input type="date" name="register_entry_date" class="form-control" value="{{ default_date }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Last Name <span class="text-danger">*</span></label>
+        <input type="text" name="last_name" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">First Name <span class="text-danger">*</span></label>
+        <input type="text" name="first_name" class="form-control" required autofocus>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Middle Name</label>
+        <input type="text" name="middle_name" class="form-control">
+    </div>
+</div>
+
+<h6 class="text-coop fw-bold small text-uppercase mb-2">I. Membership Upon Acceptance</h6>
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <label class="form-label">Date Accepted (I-a) <span class="text-danger">*</span></label>
+        <input type="date" name="membership_date" class="form-control" value="{{ default_date }}" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">BOD Resolution No. (I-b) <span class="text-danger">*</span></label>
+        <input type="text" name="bod_acceptance_resolution" class="form-control" placeholder="BOD-2025-01" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Type/Kind of Membership (I-c) <span class="text-danger">*</span></label>
+        <select name="membership_type" class="form-select" required>
+            {% for mt in membership_types %}
+            <option value="{{ mt }}">{{ mt }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">No. of Shares (I-d.1) <span class="text-danger">*</span></label>
+        <input type="number" name="initial_shares" class="form-control" step="0.01" min="0" value="0" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Subscription Amount ₱ (I-d.2) <span class="text-danger">*</span></label>
+        <input type="number" name="initial_subscription_amount" class="form-control" step="0.01" min="0" value="0" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Initial Paid-up Capital ₱ (I-d.3) <span class="text-danger">*</span></label>
+        <input type="number" name="initial_paid_up_capital" class="form-control" step="0.01" min="0" value="0" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Opening Savings Balance ₱</label>
+        <input type="number" name="savings_balance" class="form-control" step="0.01" min="0" value="0">
+        <div class="form-text">Operational opening balance (not part of MC minimum).</div>
+    </div>
+</div>
+
+<h6 class="text-coop fw-bold small text-uppercase mb-2">II. Member Profile</h6>
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <label class="form-label">Address (II-a) <span class="text-danger">*</span></label>
+        <input type="text" name="address" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Date of Birth (II-b) <span class="text-danger">*</span></label>
+        <input type="date" name="birth_date" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Gender (II-d) <span class="text-danger">*</span></label>
+        <select name="gender" class="form-select" required>
+            <option value="">— Select —</option>
+            {% for g in genders %}
+            <option value="{{ g }}">{{ g }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Civil Status (II-e) <span class="text-danger">*</span></label>
+        <select name="civil_status" class="form-select" required>
+            <option value="">— Select —</option>
+            {% for cs in civil_statuses %}
+            <option value="{{ cs }}">{{ cs }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Highest Education (II-f) <span class="text-danger">*</span></label>
+        <select name="highest_education" class="form-select" required>
+            <option value="">— Select —</option>
+            {% for ed in education_levels %}
+            <option value="{{ ed }}">{{ ed }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Occupation / Income Source (II-g) <span class="text-danger">*</span></label>
+        <input type="text" name="occupation_income_source" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">No. of Dependents (II-h) <span class="text-danger">*</span></label>
+        <input type="number" name="number_of_dependents" class="form-control" min="0" value="0" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Religion / Social Affiliation (II-i) <span class="text-danger">*</span></label>
+        <input type="text" name="religion_social_affiliation" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Annual Income ₱ (II-j) <span class="text-danger">*</span></label>
+        <input type="number" name="annual_income" class="form-control" step="0.01" min="0" value="0" required>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" placeholder="optional">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Phone / Mobile</label>
+        <input type="text" name="phone" class="form-control" placeholder="optional">
+    </div>
+</div>
+
+<h6 class="text-coop fw-bold small text-uppercase mb-2">Status &amp; Termination (III)</h6>
+<div class="row g-3">
+    <div class="col-md-4">
+        <label class="form-label">Membership Status</label>
+        <select name="status" id="memberStatusSelect" class="form-select">
+            {% for st in member_statuses %}
+            <option value="{{ st }}">{{ st }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4 termination-fields d-none">
+        <label class="form-label">Termination Date (III) <span class="text-danger">*</span></label>
+        <input type="date" name="termination_date" id="terminationDate" class="form-control">
+    </div>
+    <div class="col-md-4 termination-fields d-none">
+        <label class="form-label">BOD Resolution (Termination) <span class="text-danger">*</span></label>
+        <input type="text" name="termination_bod_resolution" id="terminationBodResolution" class="form-control">
+    </div>
+</div>

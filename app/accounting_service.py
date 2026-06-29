@@ -107,24 +107,104 @@ def _recent_month_starts(months=6):
     return starts
 
 
-def account_balance(account_id):
-    totals = db.session.query(
+def _month_tuple(value):
+    if value is None:
+        return None
+    if hasattr(value, "date"):
+        try:
+            value = value.date()
+        except (TypeError, AttributeError):
+            pass
+    if hasattr(value, "year") and hasattr(value, "month"):
+        return (value.year, value.month)
+    return None
+
+
+def _account_balances_map(accounts):
+    """Batch-compute balances for many accounts in one query."""
+    if not accounts:
+        return {}
+    id_to_account = {account.id: account for account in accounts}
+    rows = db.session.query(
+        JournalLine.account_id,
         func.coalesce(func.sum(JournalLine.debit), 0),
         func.coalesce(func.sum(JournalLine.credit), 0),
-    ).filter(JournalLine.account_id == account_id).one()
+    ).filter(JournalLine.account_id.in_(id_to_account)).group_by(JournalLine.account_id).all()
 
+    balances = {account_id: Decimal("0") for account_id in id_to_account}
+    for account_id, debit_sum, credit_sum in rows:
+        account = id_to_account[account_id]
+        debit_total = _decimal(debit_sum)
+        credit_total = _decimal(credit_sum)
+        if account.normal_balance == "Debit":
+            balances[account_id] = debit_total - credit_total
+        else:
+            balances[account_id] = credit_total - debit_total
+    return balances
+
+
+def account_balance(account_id):
     account = Account.query.get(account_id)
-    debit_total = _decimal(totals[0])
-    credit_total = _decimal(totals[1])
-
-    if account.normal_balance == "Debit":
-        return debit_total - credit_total
-    return credit_total - debit_total
+    if not account:
+        return Decimal("0")
+    return _account_balances_map([account]).get(account_id, Decimal("0"))
 
 
 def _balance_for_codes(codes):
     accounts = Account.query.filter(Account.code.in_(codes)).all()
-    return sum(account_balance(a.id) for a in accounts)
+    balances = _account_balances_map(accounts)
+    return sum(balances.get(account.id, Decimal("0")) for account in accounts)
+
+
+def _month_trunc_column():
+    return func.date_trunc("month", JournalEntry.entry_date)
+
+
+def _fetch_monthly_code_totals(month_starts, account_codes):
+    """{(year, month): {code: (debit_sum, credit_sum)}} in one grouped query."""
+    if not month_starts or not account_codes:
+        return {}
+
+    period_start = month_starts[0]
+    last = month_starts[-1]
+    period_end = _next_month_start(last.year, last.month)
+    month_col = _month_trunc_column()
+
+    rows = (
+        db.session.query(
+            month_col.label("month"),
+            Account.code,
+            func.coalesce(func.sum(JournalLine.debit), 0),
+            func.coalesce(func.sum(JournalLine.credit), 0),
+        )
+        .select_from(JournalLine)
+        .join(JournalEntry, JournalLine.entry_id == JournalEntry.id)
+        .join(Account, JournalLine.account_id == Account.id)
+        .filter(
+            Account.code.in_(tuple(account_codes)),
+            JournalEntry.entry_date >= period_start,
+            JournalEntry.entry_date < period_end,
+        )
+        .group_by(month_col, Account.code)
+        .all()
+    )
+
+    totals = {}
+    for month_value, code, debit_sum, credit_sum in rows:
+        key = _month_tuple(month_value)
+        if key is None:
+            continue
+        totals.setdefault(key, {})[code] = (float(debit_sum or 0), float(credit_sum or 0))
+    return totals
+
+
+def _sum_from_monthly_totals(monthly_totals, month_start, account_codes, field):
+    bucket = monthly_totals.get((month_start.year, month_start.month), {})
+    total = 0.0
+    for code in account_codes:
+        debit_sum, credit_sum = bucket.get(code, (0.0, 0.0))
+        total += debit_sum if field == "debit" else credit_sum
+    return total
 
 
 def _sum_lines_in_period(account_codes, period_start, period_end, field):
@@ -137,6 +217,34 @@ def _sum_lines_in_period(account_codes, period_start, period_end, field):
         JournalEntry.entry_date < period_end,
     ).scalar()
     return float(total or 0)
+
+
+def _journal_counts_by_month(month_starts):
+    """{ (year, month): count } for each month in month_starts."""
+    if not month_starts:
+        return {}
+
+    period_start = month_starts[0]
+    last = month_starts[-1]
+    period_end = _next_month_start(last.year, last.month)
+    month_col = _month_trunc_column()
+
+    rows = (
+        db.session.query(month_col, func.count(JournalEntry.id))
+        .filter(
+            JournalEntry.entry_date >= period_start,
+            JournalEntry.entry_date < period_end,
+        )
+        .group_by(month_col)
+        .all()
+    )
+
+    counts = {}
+    for month_value, count in rows:
+        key = _month_tuple(month_value)
+        if key is not None:
+            counts[key] = int(count or 0)
+    return counts
 
 
 def _journal_count_in_period(period_start, period_end):
@@ -178,16 +286,26 @@ def dashboard_stats():
     return {"summary": summary, "cards": cards}
 
 
+def _total_assets():
+    accounts = Account.query.filter_by(account_type="Asset", is_active=True).all()
+    balances = _account_balances_map(accounts)
+    return sum(balances.get(account.id, Decimal("0")) for account in accounts)
+
+
 def dashboard_trends(months=6):
     month_starts = _recent_month_starts(months)
     labels = [start.strftime("%b %Y") for start in month_starts]
 
+    all_codes = tuple({code for spec in TREND_DATASETS for code in spec["codes"]})
+    monthly_totals = _fetch_monthly_code_totals(month_starts, all_codes)
+    journal_counts_map = _journal_counts_by_month(month_starts)
+
     datasets = []
     for spec in TREND_DATASETS:
-        data = []
-        for start in month_starts:
-            end = _next_month_start(start.year, start.month)
-            data.append(_sum_lines_in_period(spec["codes"], start, end, spec["field"]))
+        data = [
+            _sum_from_monthly_totals(monthly_totals, start, spec["codes"], spec["field"])
+            for start in month_starts
+        ]
         datasets.append({
             "label": spec["label"],
             "data": data,
@@ -196,10 +314,10 @@ def dashboard_trends(months=6):
             "borderRadius": 6,
         })
 
-    journal_counts = []
-    for start in month_starts:
-        end = _next_month_start(start.year, start.month)
-        journal_counts.append(_journal_count_in_period(start, end))
+    journal_counts = [
+        journal_counts_map.get((start.year, start.month), 0)
+        for start in month_starts
+    ]
 
     return {
         "labels": labels,
@@ -208,11 +326,35 @@ def dashboard_trends(months=6):
     }
 
 
-def _total_assets():
-    total = Decimal("0")
-    for account in Account.query.filter_by(account_type="Asset", is_active=True):
-        total += account_balance(account.id)
-    return total
+def dashboard_bundle(
+    months=6,
+    *,
+    include_trends=True,
+    include_stats=True,
+    include_columnar=True,
+    include_journals=True,
+):
+    """Single-request dashboard payload; stats computed once and reused."""
+    result = {}
+    stats_payload = None
+    summary = None
+
+    if include_stats or include_columnar:
+        stats_payload = dashboard_stats()
+        summary = stats_payload["summary"]
+        if include_stats:
+            result["stats"] = stats_payload
+
+    if include_trends:
+        result["trends"] = dashboard_trends(months=months)
+
+    if include_columnar:
+        result["columnar"] = dashboard_columnar(summary=summary)
+
+    if include_journals:
+        result["journals"] = recent_journal_entries()
+
+    return result
 
 
 def _pct_of_assets(amount, total_assets):
@@ -221,18 +363,28 @@ def _pct_of_assets(amount, total_assets):
     return round(float(amount) / float(total_assets) * 100, 1)
 
 
-def dashboard_columnar():
-    stats = dashboard_stats()["summary"]
-    total_assets = stats["total_assets"] or 1
+def dashboard_columnar(summary=None):
+    if summary is None:
+        summary = dashboard_stats()["summary"]
+    total_assets = summary["total_assets"] or 1
 
     month_starts = _recent_month_starts(2)
     current_start = month_starts[-1]
     prior_start = month_starts[-2] if len(month_starts) > 1 else month_starts[-1]
-    current_end = _next_month_start(current_start.year, current_start.month)
-    prior_end = _next_month_start(prior_start.year, prior_start.month)
 
-    current_journal_count = _journal_count_in_period(current_start, current_end)
-    prior_journal_count = _journal_count_in_period(prior_start, prior_end)
+    activity_codes = tuple({
+        code
+        for codes in (SHARE_CODES, SAVINGS_CODES, CASH_CODES, LOAN_CODES)
+        for code in codes
+    })
+    monthly_totals = _fetch_monthly_code_totals(month_starts, activity_codes)
+    journal_counts_map = _journal_counts_by_month(month_starts)
+
+    current_journal_count = journal_counts_map.get((current_start.year, current_start.month), 0)
+    prior_journal_count = journal_counts_map.get((prior_start.year, prior_start.month), 0)
+
+    def period_sum(codes, month_start, field):
+        return _sum_from_monthly_totals(monthly_totals, month_start, codes, field)
 
     def activity_label(current, prior, suffix=""):
         if current > prior:
@@ -249,33 +401,33 @@ def dashboard_columnar():
                 {
                     "indicator": "Active Members",
                     "subtitle": "Registered cooperative members",
-                    "amount": stats["total_members"],
+                    "amount": summary["total_members"],
                     "format": "count",
                     "pct": None,
-                    "activity": f"{stats['total_members']} active",
+                    "activity": f"{summary['total_members']} active",
                     "url": "/members",
                 },
                 {
                     "indicator": "Share Capital",
                     "subtitle": "Paid-up share capital (Account 30101)",
-                    "amount": stats["total_share_capital"],
+                    "amount": summary["total_share_capital"],
                     "format": "currency",
-                    "pct": _pct_of_assets(stats["total_share_capital"], total_assets),
+                    "pct": _pct_of_assets(summary["total_share_capital"], total_assets),
                     "activity": activity_label(
-                        _sum_lines_in_period(SHARE_CODES, current_start, current_end, "credit"),
-                        _sum_lines_in_period(SHARE_CODES, prior_start, prior_end, "credit"),
+                        period_sum(SHARE_CODES, current_start, "credit"),
+                        period_sum(SHARE_CODES, prior_start, "credit"),
                     ),
                     "url": "/members?focus=share",
                 },
                 {
                     "indicator": "Savings Deposits",
                     "subtitle": "Member saving deposit liabilities",
-                    "amount": stats["total_savings"],
+                    "amount": summary["total_savings"],
                     "format": "currency",
-                    "pct": _pct_of_assets(stats["total_savings"], total_assets),
+                    "pct": _pct_of_assets(summary["total_savings"], total_assets),
                     "activity": activity_label(
-                        _sum_lines_in_period(SAVINGS_CODES, current_start, current_end, "credit"),
-                        _sum_lines_in_period(SAVINGS_CODES, prior_start, prior_end, "credit"),
+                        period_sum(SAVINGS_CODES, current_start, "credit"),
+                        period_sum(SAVINGS_CODES, prior_start, "credit"),
                     ),
                     "url": "/members?focus=savings",
                 },
@@ -288,31 +440,31 @@ def dashboard_columnar():
                 {
                     "indicator": "Cash & Equivalents",
                     "subtitle": "Accounts 10101–10105 per CDA chart",
-                    "amount": stats["total_cash"],
+                    "amount": summary["total_cash"],
                     "format": "currency",
-                    "pct": _pct_of_assets(stats["total_cash"], total_assets),
+                    "pct": _pct_of_assets(summary["total_cash"], total_assets),
                     "activity": activity_label(
-                        _sum_lines_in_period(CASH_CODES, current_start, current_end, "debit"),
-                        _sum_lines_in_period(CASH_CODES, prior_start, prior_end, "debit"),
+                        period_sum(CASH_CODES, current_start, "debit"),
+                        period_sum(CASH_CODES, prior_start, "debit"),
                     ),
                     "url": "/accounts?category=Cash and Cash Equivalents",
                 },
                 {
                     "indicator": "Loans Receivable",
                     "subtitle": "Loans receivable – current (11101)",
-                    "amount": stats["total_loans_receivable"],
+                    "amount": summary["total_loans_receivable"],
                     "format": "currency",
-                    "pct": _pct_of_assets(stats["total_loans_receivable"], total_assets),
+                    "pct": _pct_of_assets(summary["total_loans_receivable"], total_assets),
                     "activity": activity_label(
-                        _sum_lines_in_period(LOAN_CODES, current_start, current_end, "debit"),
-                        _sum_lines_in_period(LOAN_CODES, prior_start, prior_end, "debit"),
+                        period_sum(LOAN_CODES, current_start, "debit"),
+                        period_sum(LOAN_CODES, prior_start, "debit"),
                     ),
                     "url": "/accounts?code=11101",
                 },
                 {
                     "indicator": "Journal Entries",
                     "subtitle": "Posted transactions this period",
-                    "amount": stats["journal_count"],
+                    "amount": summary["journal_count"],
                     "format": "count",
                     "pct": None,
                     "activity": activity_label(current_journal_count, prior_journal_count, " posted"),
@@ -324,7 +476,7 @@ def dashboard_columnar():
 
     return {
         "sections": sections,
-        "total_assets": stats["total_assets"],
+        "total_assets": summary["total_assets"],
         "period_label": current_start.strftime("%B %Y"),
         "prior_period_label": prior_start.strftime("%B %Y"),
     }

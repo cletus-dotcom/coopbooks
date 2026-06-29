@@ -1,6 +1,6 @@
 from werkzeug.security import generate_password_hash
 
-from app.config import USER_ROLES, is_valid_user_role, normalize_role
+from app.config import USER_ROLES, assignable_user_roles, is_valid_user_role, normalize_role
 from app.models import User
 
 
@@ -19,7 +19,7 @@ def serialize_user(user):
     }
 
 
-def parse_user_form(data, user_id=None, require_password=False):
+def parse_user_form(data, user_id=None, require_password=False, current_role=None):
     username = (data.get("username") or "").strip()
     full_name = (data.get("full_name") or "").strip()
     email = (data.get("email") or "").strip() or None
@@ -32,6 +32,11 @@ def parse_user_form(data, user_id=None, require_password=False):
 
     if not is_valid_user_role(role):
         return None, "Invalid role selected."
+
+    normalized_role = normalize_role(role)
+    allowed = assignable_user_roles(current_role)
+    if normalized_role not in allowed:
+        return None, "You cannot assign that role."
 
     if status not in ("Active", "Inactive"):
         return None, "Invalid status."
@@ -52,7 +57,7 @@ def parse_user_form(data, user_id=None, require_password=False):
         "username": username,
         "full_name": full_name,
         "email": email,
-        "role": normalize_role(role),
+        "role": normalized_role,
         "status": status,
     }
     if password:

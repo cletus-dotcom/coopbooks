@@ -18,12 +18,14 @@
     <div class="dashboard-card">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <div>
-                <h5 class="text-coop fw-bold mb-0">Registered Cooperatives</h5>
-                <p class="small text-muted mb-0">Platform administration — separate database per coop</p>
+                <h5 class="text-coop fw-bold mb-0">Cooperative Settings</h5>
+                <p class="small text-muted mb-0">Single cooperative profile for this installation</p>
             </div>
+            {% if not coops %}
             <a href="{{ url_for('main_routes.admin_coops_register') }}" class="btn btn-coop btn-sm">
-                <i class="bi bi-plus-circle"></i> Register Coop
+                <i class="bi bi-plus-circle"></i> Register Cooperative
             </a>
+            {% endif %}
         </div>
         <div class="table-responsive">
             <table class="table table-sm table-hover">
@@ -37,8 +39,8 @@
                     <tr>
                         <td><code>{{ coop.slug }}</code></td>
                         <td>
-                            {% if coop.logo_filename %}
-                            <img src="{{ url_for('main_routes.coop_logo', slug=coop.slug, filename=coop.logo_filename) }}" alt="" style="height:24px;width:24px;object-fit:contain" class="me-1">
+                            {% if coop.logo_data %}
+                            <img src="{{ url_for('main_routes.coop_logo') }}" alt="" style="height:24px;width:24px;object-fit:contain" class="me-1">
                             {% endif %}
                             {{ coop.name }}
                         </td>

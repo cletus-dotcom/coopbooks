@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash
 
 from app import db
 from app.models import Account, Cooperative, JournalEntry, JournalLine, Member, MemberLedger, User, local_time
-from app.seed_data import CDA_CHART_OF_ACCOUNTS, SAMPLE_JOURNALS, SAMPLE_MEMBERS
+from app.seed_data import CDA_CHART_OF_ACCOUNTS, SAMPLE_JOURNALS
 from app.member_service import create_opening_ledger_entries, member_has_ledger, record_ledger_entry
 
 
@@ -73,12 +73,40 @@ def _seed_members():
     if Member.query.count() > 0:
         return
 
+    from app.member_registry_config import build_full_name
+
     today = local_time().date()
-    for member_no, full_name, share, savings in SAMPLE_MEMBERS:
+    samples = [
+        ("M-001", "Dela Cruz", "Juan", None, "111-111-111-000", 5000, 2500),
+        ("M-002", "Santos", "Maria", "L.", "222-222-222-000", 10000, 8000),
+        ("M-003", "Reyes", "Pedro", None, "333-333-333-000", 2500, 1200),
+        ("M-004", "Garcia", "Ana", "M.", "444-444-444-000", 7500, 4500),
+        ("M-005", "Mendoza", "Luis", None, "555-555-555-000", 3000, 600),
+    ]
+    for member_no, last, first, middle, tin, share, savings in samples:
         db.session.add(Member(
             member_no=member_no,
-            full_name=full_name,
+            last_name=last,
+            first_name=first,
+            middle_name=middle,
+            full_name=build_full_name(last, first, middle),
+            tin=tin,
             membership_date=today,
+            bod_acceptance_resolution="BOD-SEED-001",
+            membership_type="Regular",
+            initial_shares=share / 100,
+            initial_subscription_amount=share,
+            initial_paid_up_capital=share,
+            address="Philippines",
+            birth_date=date(1985, 1, 15),
+            gender="Male" if first in ("Juan", "Pedro", "Luis") else "Female",
+            civil_status="Single",
+            highest_education="College",
+            occupation_income_source="Employee",
+            number_of_dependents=1,
+            religion_social_affiliation="Roman Catholic",
+            annual_income=Decimal("300000"),
+            register_entry_date=today,
             share_capital=share,
             savings_balance=savings,
         ))

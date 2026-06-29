@@ -82,6 +82,14 @@
         .ledger-preview { margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid rgba(27, 94, 32, 0.1); }
         .ledger-preview table { font-size: 0.78rem; margin-bottom: 0; }
         .ledger-badge { font-size: 0.7rem; }
+        .registry-section-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--coop-green);
+            margin: 0.5rem 0;
+        }
     </style>
 </head>
 <body>
@@ -104,6 +112,7 @@
             <div>
                 <h5 class="text-coop fw-bold mb-1"><i class="bi bi-people"></i> Member Registry</h5>
                 <div class="small text-muted">
+                    CDA MC 2012-16 minimum membership information &middot;
                     {{ totals.active_count }} active
                     {% if focus != 'savings' %}&middot; Share: <strong>₱{{ '{:,.2f}'.format(totals.total_share_capital) }}</strong>{% endif %}
                     {% if focus != 'share' %}&middot; Savings: <strong>₱{{ '{:,.2f}'.format(totals.total_savings) }}</strong>{% endif %}
@@ -136,12 +145,12 @@
         <!-- Mobile: expandable cards -->
         <div class="mobile-cards" id="membersMobile">
             {% for m in members %}
-            <div class="member-card" data-search="{{ m.member_no }} {{ m.full_name }} {{ m.email or '' }} {{ m.phone or '' }} {{ m.address or '' }} {{ m.status }}">
+            <div class="member-card" data-search="{{ m.member_no }} {{ m.full_name }} {{ m.last_name }} {{ m.first_name }} {{ m.tin or '' }} {{ m.email or '' }} {{ m.phone or '' }} {{ m.address or '' }} {{ m.membership_type or '' }} {{ m.status }}">
                 <div class="member-card-summary" onclick="toggleMemberCard(this.parentElement)">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <div class="fw-bold">{{ m.full_name }}</div>
-                            <div class="small text-muted">{{ m.member_no }} &middot; <span class="badge bg-success">{{ m.status }}</span></div>
+                            <div class="small text-muted">{{ m.member_no }} &middot; <span class="badge bg-{{ 'success' if m.status == 'Active' else ('danger' if m.status == 'Terminated' else 'secondary') }}">{{ m.status }}</span></div>
                         </div>
                         <i class="bi bi-chevron-right text-coop expand-chevron"></i>
                     </div>
@@ -155,12 +164,10 @@
                     </div>
                 </div>
                 <div class="member-card-detail">
+                    {% include "_member_registry_detail.html" %}
                     <div class="detail-grid pt-2">
-                        <div class="detail-item"><label>Email</label><span>{{ m.email or '—' }}</span></div>
-                        <div class="detail-item"><label>Phone</label><span>{{ m.phone or '—' }}</span></div>
-                        <div class="detail-item"><label>Membership Date</label><span>{{ m.membership_date or '—' }}</span></div>
-                        <div class="detail-item"><label>Registered</label><span>{{ m.created_at.strftime('%Y-%m-%d') if m.created_at else '—' }}</span></div>
-                        <div class="detail-item" style="grid-column:1/-1"><label>Address</label><span>{{ m.address or '—' }}</span></div>
+                        <div class="detail-item"><label>Share Capital (current)</label><span>₱{{ '{:,.2f}'.format(m.share_capital|float) }}</span></div>
+                        <div class="detail-item"><label>Savings (current)</label><span>₱{{ '{:,.2f}'.format(m.savings_balance|float) }}</span></div>
                     </div>
                     {% set ls = ledger_summaries[m.id] %}
                     {% set recent = recent_ledger[m.id] %}
@@ -204,7 +211,7 @@
                 </thead>
                 <tbody>
                     {% for m in members %}
-                    <tr class="member-row" data-search="{{ m.member_no }} {{ m.full_name }} {{ m.email or '' }} {{ m.phone or '' }} {{ m.address or '' }} {{ m.status }}">
+                    <tr class="member-row" data-search="{{ m.member_no }} {{ m.full_name }} {{ m.last_name }} {{ m.first_name }} {{ m.tin or '' }} {{ m.email or '' }} {{ m.phone or '' }} {{ m.address or '' }} {{ m.membership_type or '' }} {{ m.status }}">
                         <td><button type="button" class="expand-btn" aria-label="Expand row"><i class="bi bi-chevron-right"></i></button></td>
                         <td><code>{{ m.member_no }}</code></td>
                         <td class="fw-semibold">{{ m.full_name }}</td>
@@ -214,7 +221,7 @@
                         {% if focus != 'share' %}
                         <td class="{{ 'fw-bold text-coop' if focus == 'savings' else '' }}">₱{{ '{:,.2f}'.format(m.savings_balance|float) }}</td>
                         {% endif %}
-                        <td><span class="badge bg-{{ 'success' if m.status == 'Active' else 'secondary' }}">{{ m.status }}</span></td>
+                        <td><span class="badge bg-{{ 'success' if m.status == 'Active' else ('danger' if m.status == 'Terminated' else 'secondary') }}">{{ m.status }}</span></td>
                         <td>
                             {% set ls = ledger_summaries[m.id] %}
                             {% if ls.has_ledger %}
@@ -224,17 +231,14 @@
                             {% endif %}
                         </td>
                     </tr>
-                    <tr class="detail-row d-none" data-parent-search="{{ m.member_no }} {{ m.full_name }} {{ m.email or '' }} {{ m.phone or '' }} {{ m.address or '' }} {{ m.status }}">
+                    <tr class="detail-row d-none" data-parent-search="{{ m.member_no }} {{ m.full_name }} {{ m.last_name }} {{ m.first_name }} {{ m.tin or '' }} {{ m.email or '' }} {{ m.phone or '' }} {{ m.address or '' }} {{ m.membership_type or '' }} {{ m.status }}">
                         <td colspan="{{ 7 if not focus else 6 }}">
                             <div class="detail-panel">
-                                <div class="detail-grid">
-                                    <div class="detail-item"><label>Email</label><span>{{ m.email or '—' }}</span></div>
-                                    <div class="detail-item"><label>Phone</label><span>{{ m.phone or '—' }}</span></div>
-                                    <div class="detail-item"><label>Membership Date</label><span>{{ m.membership_date or '—' }}</span></div>
-                                    <div class="detail-item"><label>Share Capital</label><span>₱{{ '{:,.2f}'.format(m.share_capital|float) }}</span></div>
-                                    <div class="detail-item"><label>Savings Balance</label><span>₱{{ '{:,.2f}'.format(m.savings_balance|float) }}</span></div>
-                                    <div class="detail-item"><label>Registered</label><span>{{ m.created_at.strftime('%Y-%m-%d %H:%M') if m.created_at else '—' }}</span></div>
-                                    <div class="detail-item" style="grid-column:1/-1"><label>Address</label><span>{{ m.address or '—' }}</span></div>
+                                {% include "_member_registry_detail.html" %}
+                                <div class="detail-grid mt-2">
+                                    <div class="detail-item"><label>Share Capital (current)</label><span>₱{{ '{:,.2f}'.format(m.share_capital|float) }}</span></div>
+                                    <div class="detail-item"><label>Savings Balance (current)</label><span>₱{{ '{:,.2f}'.format(m.savings_balance|float) }}</span></div>
+                                    <div class="detail-item"><label>System Registered</label><span>{{ m.created_at.strftime('%Y-%m-%d %H:%M') if m.created_at else '—' }}</span></div>
                                 </div>
                                 {% set ls = ledger_summaries[m.id] %}
                                 {% set recent = recent_ledger[m.id] %}
@@ -279,57 +283,16 @@
 </main>
 
 {% if can_add %}
-<div class="modal fade" id="addMemberModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+<div class="modal fade" id="addMemberModal" tabindex="-1" aria-labelledby="addMemberModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-coop text-white">
-                <h5 class="modal-title"><i class="bi bi-person-plus"></i> Add Member</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="{{ url_for('main_routes.members_add') }}">
+            <form method="POST" action="{{ url_for('main_routes.members_add') }}" class="modal-form-scroll">
+                <div class="modal-header bg-coop text-white">
+                    <h5 class="modal-title" id="addMemberModalLabel"><i class="bi bi-person-plus"></i> Add Member</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
                 <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Member #</label>
-                            <input type="text" name="member_no" class="form-control" value="{{ next_member_no }}" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Membership Date</label>
-                            <input type="date" name="membership_date" class="form-control" value="{{ default_date }}" required>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Full Name <span class="text-danger">*</span></label>
-                            <input type="text" name="full_name" class="form-control" required autofocus>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="email" class="form-control" placeholder="optional">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Phone</label>
-                            <input type="text" name="phone" class="form-control" placeholder="optional">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Address</label>
-                            <input type="text" name="address" class="form-control" placeholder="optional">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Share Capital (₱)</label>
-                            <input type="number" name="share_capital" class="form-control" step="0.01" min="0" value="0">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Savings Balance (₱)</label>
-                            <input type="number" name="savings_balance" class="form-control" step="0.01" min="0" value="0">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Status</label>
-                            <select name="status" class="form-select">
-                                {% for st in member_statuses %}
-                                <option value="{{ st }}">{{ st }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
+                    {% include "_member_form_fields.html" %}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -404,6 +367,20 @@
         const hasMembers = document.querySelectorAll('.member-row, .member-card').length > 0;
         noResults.style.display = hasMembers && visible === 0 ? 'block' : 'none';
     });
+
+    const statusSelect = document.getElementById('memberStatusSelect');
+    const terminationFields = document.querySelectorAll('.termination-fields');
+    const terminationDate = document.getElementById('terminationDate');
+    const terminationBod = document.getElementById('terminationBodResolution');
+
+    function toggleTerminationFields() {
+        const show = statusSelect?.value === 'Terminated';
+        terminationFields.forEach(el => el.classList.toggle('d-none', !show));
+        if (terminationDate) terminationDate.required = show;
+        if (terminationBod) terminationBod.required = show;
+    }
+    statusSelect?.addEventListener('change', toggleTerminationFields);
+    toggleTerminationFields();
 </script>
 </body>
 </html>

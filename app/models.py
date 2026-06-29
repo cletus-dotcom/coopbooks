@@ -3,10 +3,9 @@ from datetime import datetime
 import pytz
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from sqlalchemy import Index
+
 from app import db
-
-
-TENANT_BIND = "tenant"
 
 
 def local_time():
@@ -16,7 +15,6 @@ def local_time():
 
 class TenantModel(db.Model):
     __abstract__ = True
-    __bind_key__ = TENANT_BIND
 
 
 class User(TenantModel):
@@ -66,27 +64,71 @@ class Account(TenantModel):
 
 
 class Member(TenantModel):
+    """Membership registry per CDA MC 2012-16 minimum information."""
+
     __tablename__ = "members"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    # A. Name of member
+    last_name = db.Column(db.String(80), nullable=False, default="")
+    first_name = db.Column(db.String(80), nullable=False, default="")
+    middle_name = db.Column(db.String(80))
+    full_name = db.Column(db.String(200), nullable=False)
+
+    # B. Membership number
     member_no = db.Column(db.String(30), unique=True, nullable=False)
-    full_name = db.Column(db.String(150), nullable=False)
+
+    # C. TIN
+    tin = db.Column(db.String(30))
+
+    # I. Information on membership upon acceptance
+    membership_date = db.Column(db.Date)  # a) date accepted
+    bod_acceptance_resolution = db.Column(db.String(50))
+    membership_type = db.Column(db.String(30), default="Regular")
+    initial_shares = db.Column(db.Numeric(12, 2), default=0)
+    initial_subscription_amount = db.Column(db.Numeric(14, 2), default=0)
+    initial_paid_up_capital = db.Column(db.Numeric(14, 2), default=0)
+
+    # II. Member profile
+    address = db.Column(db.String(255))
+    birth_date = db.Column(db.Date)
+    gender = db.Column(db.String(20))
+    civil_status = db.Column(db.String(30))
+    highest_education = db.Column(db.String(40))
+    occupation_income_source = db.Column(db.String(120))
+    number_of_dependents = db.Column(db.Integer, default=0)
+    religion_social_affiliation = db.Column(db.String(120))
+    annual_income = db.Column(db.Numeric(14, 2))
+
+    # Register of members (RA 9520 Art. 54) / III. Termination
+    register_entry_date = db.Column(db.Date)
+    termination_date = db.Column(db.Date)
+    termination_bod_resolution = db.Column(db.String(50))
+
+    # Contact (supplementary)
     email = db.Column(db.String(120))
     phone = db.Column(db.String(30))
-    address = db.Column(db.String(255))
-    membership_date = db.Column(db.Date)
+
+    # Current cooperative account balances (operational)
     share_capital = db.Column(db.Numeric(14, 2), default=0)
     savings_balance = db.Column(db.Numeric(14, 2), default=0)
     status = db.Column(db.String(20), default="Active")
     created_at = db.Column(db.DateTime, default=local_time)
 
-    MEMBER_STATUSES = ("Active", "Inactive")
+    MEMBER_STATUSES = ("Active", "Inactive", "Terminated")
 
     ledger_entries = db.relationship(
         "MemberLedger",
         back_populates="member",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def age(self):
+        from app.member_registry_config import member_age
+
+        return member_age(self.birth_date)
 
 
 class MemberLedger(TenantModel):
@@ -125,6 +167,7 @@ class MemberLedger(TenantModel):
 
 class JournalEntry(TenantModel):
     __tablename__ = "journal_entries"
+    __table_args__ = (Index("ix_journal_entries_entry_date", "entry_date"),)
 
     id = db.Column(db.Integer, primary_key=True)
     entry_no = db.Column(db.String(30), unique=True, nullable=False)
@@ -143,6 +186,10 @@ class JournalEntry(TenantModel):
 
 class JournalLine(TenantModel):
     __tablename__ = "journal_lines"
+    __table_args__ = (
+        Index("ix_journal_lines_account_id", "account_id"),
+        Index("ix_journal_lines_entry_id", "entry_id"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     entry_id = db.Column(db.Integer, db.ForeignKey("journal_entries.id"), nullable=False)

@@ -1,0 +1,27 @@
+{# CDA MC 2012-16 — member detail panel fields #}
+<div class="detail-grid">
+    <div class="detail-item"><label>Registry Name</label><span>{{ m.full_name }}</span></div>
+    <div class="detail-item"><label>TIN</label><span>{{ m.tin or '—' }}</span></div>
+    <div class="detail-item"><label>Membership Type</label><span>{{ m.membership_type or '—' }}</span></div>
+    <div class="detail-item"><label>Date Accepted</label><span>{{ m.membership_date or '—' }}</span></div>
+    <div class="detail-item"><label>BOD Resolution (Acceptance)</label><span>{{ m.bod_acceptance_resolution or '—' }}</span></div>
+    <div class="detail-item"><label>Register Entry Date</label><span>{{ m.register_entry_date or (m.created_at.strftime('%Y-%m-%d') if m.created_at else '—') }}</span></div>
+    <div class="detail-item"><label>Initial Shares</label><span>{{ '{:,.2f}'.format(m.initial_shares|float) if m.initial_shares is not none else '—' }}</span></div>
+    <div class="detail-item"><label>Subscription Amount</label><span>₱{{ '{:,.2f}'.format(m.initial_subscription_amount|float) if m.initial_subscription_amount is not none else '0.00' }}</span></div>
+    <div class="detail-item"><label>Initial Paid-up</label><span>₱{{ '{:,.2f}'.format(m.initial_paid_up_capital|float) if m.initial_paid_up_capital is not none else '0.00' }}</span></div>
+    <div class="detail-item"><label>Address</label><span>{{ m.address or '—' }}</span></div>
+    <div class="detail-item"><label>Date of Birth</label><span>{{ m.birth_date or '—' }}{% if m.age is not none %} ({{ m.age }} yrs){% endif %}</span></div>
+    <div class="detail-item"><label>Gender</label><span>{{ m.gender or '—' }}</span></div>
+    <div class="detail-item"><label>Civil Status</label><span>{{ m.civil_status or '—' }}</span></div>
+    <div class="detail-item"><label>Education</label><span>{{ m.highest_education or '—' }}</span></div>
+    <div class="detail-item"><label>Occupation / Income Source</label><span>{{ m.occupation_income_source or '—' }}</span></div>
+    <div class="detail-item"><label>Dependents</label><span>{{ m.number_of_dependents if m.number_of_dependents is not none else '—' }}</span></div>
+    <div class="detail-item"><label>Religion / Social Affiliation</label><span>{{ m.religion_social_affiliation or '—' }}</span></div>
+    <div class="detail-item"><label>Annual Income</label><span>₱{{ '{:,.2f}'.format(m.annual_income|float) if m.annual_income is not none else '—' }}</span></div>
+    <div class="detail-item"><label>Email</label><span>{{ m.email or '—' }}</span></div>
+    <div class="detail-item"><label>Phone</label><span>{{ m.phone or '—' }}</span></div>
+    {% if m.status == 'Terminated' %}
+    <div class="detail-item"><label>Termination Date</label><span>{{ m.termination_date or '—' }}</span></div>
+    <div class="detail-item"><label>BOD Resolution (Termination)</label><span>{{ m.termination_bod_resolution or '—' }}</span></div>
+    {% endif %}
+</div>

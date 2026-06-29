@@ -48,8 +48,18 @@
             color: #64748b;
             margin-top: 0.35rem;
         }
+        .chart-loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 0.85rem;
+            background: rgba(248, 251, 248, 0.85);
+            border-radius: 8px;
+        }
         .chart-wrap {
-            position: relative;
             height: 280px;
         }
         @media (min-width: 768px) { .chart-wrap { height: 320px; } }
@@ -177,6 +187,9 @@
             <div class="tab-pane fade show active" id="trendsPane" role="tabpanel">
                 <p class="small text-muted mb-2">Monthly transaction flow by category — useful for spotting seasonal patterns in cash, savings, loans, and revenue.</p>
                 <div class="chart-wrap">
+                    <div class="chart-loading" id="trendsLoading">
+                        <span><i class="bi bi-arrow-repeat"></i> Loading trends…</span>
+                    </div>
                     <canvas id="trendsChart" aria-label="Financial trends line chart"></canvas>
                 </div>
                 <div class="trend-legend" id="trendLegend"></div>
@@ -251,6 +264,9 @@
     }
 
     function renderTrends(trends) {
+        const loading = document.getElementById('trendsLoading');
+        if (loading) loading.remove();
+
         const ctx = document.getElementById('trendsChart');
         if (trendsChart) trendsChart.destroy();
 
@@ -377,21 +393,33 @@
     }
 
     async function loadDashboard() {
-        const [statsRes, trendsRes, columnarRes, journalsRes] = await Promise.all([
-            fetch('/api/dashboard_stats'),
-            fetch('/api/dashboard_trends'),
-            fetch('/api/dashboard_columnar'),
-            fetch('/api/recent_journals'),
-        ]);
-        const stats = await statsRes.json();
-        const trends = await trendsRes.json();
-        const columnar = await columnarRes.json();
-        const journals = await journalsRes.json();
+        const trendsPromise = fetch('/api/dashboard_trends')
+            .then(r => r.json())
+            .then(trends => {
+                renderTrends(trends);
+                return trends;
+            })
+            .catch(() => {
+                const loading = document.getElementById('trendsLoading');
+                if (loading) {
+                    loading.innerHTML = '<span class="text-danger">Could not load trends.</span>';
+                }
+            });
 
-        renderCards(stats.cards);
-        renderTrends(trends);
-        renderColumnar(columnar);
-        renderJournals(journals);
+        const bundlePromise = fetch('/api/dashboard?skip_trends=1')
+            .then(r => r.json())
+            .then(bundle => {
+                if (bundle.stats) renderCards(bundle.stats.cards);
+                if (bundle.columnar) renderColumnar(bundle.columnar);
+                if (bundle.journals) renderJournals(bundle.journals);
+                return bundle;
+            })
+            .catch(() => {
+                document.getElementById('cardsGrid').innerHTML =
+                    '<p class="text-muted small">Could not load dashboard statistics.</p>';
+            });
+
+        await Promise.all([trendsPromise, bundlePromise]);
     }
 
     loadDashboard();

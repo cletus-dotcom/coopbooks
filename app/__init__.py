@@ -13,13 +13,15 @@ from app.config import (
     COOP_GREEN_DARK,
     COOP_GREEN_LIGHT,
     COOP_GOLD,
-    DB_CONFIG,
     SECRET_KEY,
     USER_ROLES,
+    assignable_user_roles,
     build_database_uri,
     can_manage_coops,
     can_post_entries,
+    database_config_error,
     is_admin_role,
+    is_platform_admin_role,
     is_platform_admin_session,
     is_serverless_host,
     sqlalchemy_engine_options,
@@ -30,9 +32,9 @@ from app.modules_config import APP_MODULES, nav_modules
 db = SQLAlchemy()
 log = logging.getLogger(__name__)
 
-from app.platform_models import CoopModuleSubscription, CoopRegistry, PlatformUser  # noqa: F401, E402
-from app.tenant_manager import TENANT_BIND, coop_logo_url, get_registry_from_session, subscribed_module_keys  # noqa: E402
-import app.models  # noqa: F401, E402 — register tenant models
+from app.platform_models import CoopModuleSubscription, CoopRegistry  # noqa: F401, E402
+from app.tenant_manager import coop_logo_url, get_coop_registry, subscribed_module_keys  # noqa: F401, E402
+import app.models  # noqa: F401, E402
 
 
 def create_app():
@@ -46,11 +48,12 @@ def create_app():
 
     load_dotenv(base.parent / ".env")
 
-    platform_uri = build_database_uri(DB_CONFIG["platform_db_name"])
-    tenant_uri = build_database_uri(DB_CONFIG["db_name"])
+    db_uri = build_database_uri()
+    db_error = database_config_error()
+    if db_error:
+        log.error(db_error)
 
-    app.config["SQLALCHEMY_DATABASE_URI"] = platform_uri
-    app.config["SQLALCHEMY_BINDS"] = {TENANT_BIND: tenant_uri}
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = sqlalchemy_engine_options()
     app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
@@ -61,16 +64,24 @@ def create_app():
     def inject_globals():
         from flask import session
 
-        registry = get_registry_from_session()
-        modules = subscribed_module_keys(registry.id if registry else None) if session.get("coop_slug") else []
+        registry = None
+        modules = []
+        try:
+            registry = get_coop_registry()
+            if registry:
+                modules = subscribed_module_keys(registry.id)
+        except Exception:
+            pass
+        current_role = session.get("role")
         return {
             "coop_green": COOP_GREEN,
             "coop_green_dark": COOP_GREEN_DARK,
             "coop_green_light": COOP_GREEN_LIGHT,
             "coop_gold": COOP_GOLD,
-            "user_roles": USER_ROLES,
+            "user_roles": assignable_user_roles(current_role),
             "can_post_entries": can_post_entries,
             "is_admin_role": is_admin_role,
+            "is_platform_admin_role": is_platform_admin_role,
             "is_platform_admin": is_platform_admin_session(session),
             "can_manage_coops": can_manage_coops(session),
             "cda_report_forms": CDA_REPORT_FORMS,
@@ -82,9 +93,11 @@ def create_app():
             "nav_module_items": nav_modules(modules),
             "coop_registry": registry,
             "coop_logo_url": coop_logo_url(registry),
+            "db_config_error": database_config_error(),
         }
 
     @app.route("/favicon.ico")
+    @app.route("/favicon.png")
     def favicon():
         return send_from_directory(
             os.path.join(app.static_folder, "images"),
@@ -97,7 +110,7 @@ def create_app():
     app.register_blueprint(main_routes)
 
     with app.app_context():
-        _bootstrap_databases()
+        _bootstrap_database()
 
     log_handler = logging.getLogger("werkzeug")
     log_handler.setLevel(logging.WARNING)
@@ -105,56 +118,43 @@ def create_app():
     return app
 
 
-def _bootstrap_databases():
-    """Initialize platform registry and default tenant."""
+def _bootstrap_database():
+    """Initialize schema, cooperative registry, and default users."""
     from werkzeug.security import generate_password_hash
 
-    from app.platform_models import PlatformUser
-    from app.tenant_manager import switch_tenant_bind
+    from app.models import User
     from app.tenant_provisioning import migrate_legacy_single_tenant
 
     try:
-        if not is_serverless_host():
-            _ensure_platform_database_exists()
-        else:
-            log.info("Skipping PostgreSQL CREATE DATABASE on serverless host")
-
         db.create_all()
+        _ensure_schema_updates()
         migrate_legacy_single_tenant()
 
         if not is_serverless_host():
             _write_static_migration_templates()
 
-        if PlatformUser.query.filter_by(username="PlatformAdmin").first() is None:
-            admin = PlatformUser(
+        from app.services import seed_tenant_database
+        seed_tenant_database()
+
+        if User.query.filter_by(username="PlatformAdmin").first() is None:
+            db.session.add(User(
                 username="PlatformAdmin",
                 full_name="Platform Administrator",
                 email="platform@coopbooks.local",
+                role="PlatformAdmin",
                 status="Active",
                 password_hash=generate_password_hash("platform123"),
-            )
-            db.session.add(admin)
+            ))
             db.session.commit()
-
-        try:
-            switch_tenant_bind("demo")
-            db.create_all()
-            _ensure_tenant_columns()
-            from app.services import seed_tenant_database
-            seed_tenant_database()
-        except Exception as exc:
-            log.warning("Tenant bootstrap skipped: %s", exc)
     except Exception as exc:
         log.error("Database bootstrap failed: %s", exc)
         if is_serverless_host() and not os.getenv("DATABASE_URL") and not os.getenv("DB_IP"):
             log.error(
-                "Vercel: set DATABASE_URL to your hosted Postgres connection string "
-                "(Supabase, Neon, etc.) in Project Settings → Environment Variables."
+                "Set DATABASE_URL to your hosted Postgres connection string in environment variables."
             )
 
 
 def _write_static_migration_templates():
-    """Write Excel import templates to static/migration_templates/."""
     from app.migration_config import IMPORT_ORDER
     from app.migration_service import build_all_templates_zip, build_template_workbook
 
@@ -166,43 +166,66 @@ def _write_static_migration_templates():
     (out_dir / "coopbooks-migration-templates.zip").write_bytes(build_all_templates_zip().getvalue())
 
 
-def _ensure_platform_database_exists():
-    from sqlalchemy import create_engine, text
-
-    db_name = DB_CONFIG["platform_db_name"]
-    admin_uri = build_database_uri("postgres")
-    try:
-        engine = create_engine(admin_uri, isolation_level="AUTOCOMMIT")
-        with engine.connect() as conn:
-            exists = conn.execute(
-                text("SELECT 1 FROM pg_database WHERE datname = :name"),
-                {"name": db_name},
-            ).scalar()
-            if not exists:
-                conn.execute(text(f'CREATE DATABASE "{db_name}"'))
-        engine.dispose()
-    except Exception as exc:
-        log.warning("Platform database auto-create skipped: %s", exc)
-
-
-def _ensure_tenant_columns():
+def _ensure_schema_updates():
     from sqlalchemy import text
+
+    from app.models import User
 
     statements = [
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS email VARCHAR(120)",
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS phone VARCHAR(30)",
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS address VARCHAR(255)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS last_name VARCHAR(80)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS first_name VARCHAR(80)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS middle_name VARCHAR(80)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS tin VARCHAR(30)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS bod_acceptance_resolution VARCHAR(50)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS membership_type VARCHAR(30) DEFAULT 'Regular'",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS initial_shares NUMERIC(12, 2) DEFAULT 0",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS initial_subscription_amount NUMERIC(14, 2) DEFAULT 0",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS initial_paid_up_capital NUMERIC(14, 2) DEFAULT 0",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS birth_date DATE",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS gender VARCHAR(20)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS civil_status VARCHAR(30)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS highest_education VARCHAR(40)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS occupation_income_source VARCHAR(120)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS number_of_dependents INTEGER DEFAULT 0",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS religion_social_affiliation VARCHAR(120)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS annual_income NUMERIC(14, 2)",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS register_entry_date DATE",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS termination_date DATE",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS termination_bod_resolution VARCHAR(50)",
+        "ALTER TABLE members ALTER COLUMN full_name TYPE VARCHAR(200)",
         "ALTER TABLE cooperatives ADD COLUMN IF NOT EXISTS tin VARCHAR(30)",
         "ALTER TABLE cooperatives ADD COLUMN IF NOT EXISTS rdo VARCHAR(80)",
+        "ALTER TABLE coop_registry ADD COLUMN IF NOT EXISTS logo_data BYTEA",
+        "ALTER TABLE coop_registry ADD COLUMN IF NOT EXISTS logo_mime_type VARCHAR(80)",
+        "CREATE INDEX IF NOT EXISTS ix_journal_entries_entry_date ON journal_entries (entry_date)",
+        "CREATE INDEX IF NOT EXISTS ix_journal_lines_account_id ON journal_lines (account_id)",
+        "CREATE INDEX IF NOT EXISTS ix_journal_lines_entry_id ON journal_lines (entry_id)",
     ]
-    for stmt in statements:
-        engine = db.engines.get(TENANT_BIND)
-        if engine:
-            with engine.begin() as conn:
-                conn.execute(text(stmt))
+    with db.engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    from app.models import Member
+
+    changed = False
+    for member in Member.query.all():
+        if not member.last_name and not member.first_name and member.full_name:
+            member.first_name = member.full_name
+            member.last_name = member.last_name or ""
+            changed = True
+        if not member.register_entry_date and member.created_at:
+            member.register_entry_date = member.created_at.date()
+            changed = True
+        if not member.membership_type:
+            member.membership_type = "Regular"
+            changed = True
+    if changed:
+        db.session.commit()
 
     from app.config import normalize_role
-    from app.models import User
 
     changed = False
     for user in User.query.all():
@@ -215,7 +238,7 @@ def _ensure_tenant_columns():
 
 
 def _ensure_member_columns():
-    _ensure_tenant_columns()
+    _ensure_schema_updates()
 
 
 def _ensure_coop_columns():

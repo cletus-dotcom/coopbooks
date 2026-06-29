@@ -25,8 +25,6 @@
     .form-control:focus { border-color: var(--coop-green); box-shadow: 0 0 0 0.2rem rgba(27, 94, 32, 0.15); }
     .back-home { margin-top: 1rem; font-size: 0.85rem; color: var(--coop-green); text-decoration: none; }
     .back-home:hover { color: var(--coop-green-dark); }
-    .platform-box { background: #f8fbf8; border-radius: 8px; padding: 0.75rem; }
-    .platform-box .form-check-label { color: #cbd5e1; }
 </style>
 {% endblock %}
 
@@ -48,29 +46,13 @@
 
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <input type="hidden" id="nextUrl" value="{{ next_url or '' }}">
-                <div class="mb-3" id="coopCodeGroup">
-                    <label for="coop_code" class="form-label">Cooperative Code</label>
-                    <input type="text" id="coop_code" name="coop_code" class="form-control" list="coopList" placeholder="e.g. demo" required>
-                    <datalist id="coopList">
-                        {% for c in coops %}
-                        <option value="{{ c.slug }}">{{ c.name }}</option>
-                        {% endfor %}
-                    </datalist>
-                    <div class="form-text">Your coop's unique login code.</div>
-                </div>
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>
-                    <input type="text" id="username" name="username" class="form-control" required>
+                    <input type="text" id="username" name="username" class="form-control" required autofocus>
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
                     <input type="password" id="password" name="password" class="form-control" required>
-                </div>
-                <div class="platform-box mb-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="platform_admin" name="platform_admin">
-                        <label class="form-check-label small" for="platform_admin">Platform administrator login</label>
-                    </div>
                 </div>
                 <button type="submit" class="btn btn-coop w-100 py-2">Login</button>
             </form>
@@ -85,13 +67,6 @@
 <script>
     const nextUrl = document.getElementById("nextUrl").value.trim();
     const loginTitle = document.getElementById("loginTitle");
-    const coopGroup = document.getElementById("coopCodeGroup");
-    const platformCheck = document.getElementById("platform_admin");
-
-    platformCheck.addEventListener("change", () => {
-        coopGroup.style.display = platformCheck.checked ? "none" : "block";
-        document.getElementById("coop_code").required = !platformCheck.checked;
-    });
 
     if (nextUrl.startsWith("/journal")) loginTitle.textContent = "General Journal";
     else if (nextUrl.startsWith("/members")) loginTitle.textContent = "Members Registry";
@@ -102,13 +77,11 @@
         event.preventDefault();
         const username = document.querySelector("#username").value.trim();
         const password = document.querySelector("#password").value.trim();
-        const coop_code = document.querySelector("#coop_code").value.trim();
-        const platform_admin = platformCheck.checked;
 
         const response = await fetch("/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password, coop_code, platform_admin, next: nextUrl })
+            body: JSON.stringify({ username, password, next: nextUrl })
         });
 
         const result = await response.json();

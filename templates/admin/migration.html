@@ -34,14 +34,14 @@
     <div class="dashboard-card welcome-card mb-3">
         <h4 class="mb-1"><i class="bi bi-database-down"></i> Cooperative Data Migration Tool</h4>
         <p class="mb-0">
-            Download Excel templates, paste legacy data from your old system, then upload into the
-            selected cooperative&rsquo;s isolated database.
+            Download Excel templates, paste legacy data from your old system, then upload into this
+            cooperative's database.
         </p>
     </div>
 
     {% if import_results is defined %}
     <div class="dashboard-card mb-3">
-        <h6 class="fw-bold text-coop">Import Results — <code>{{ selected_coop }}</code></h6>
+        <h6 class="fw-bold text-coop">Import Results{% if coop %} — {{ coop.name }}{% endif %}</h6>
         <p class="small text-muted">
             Mode: <strong>{{ import_mode }}</strong> ·
             {{ total_imported }} row(s) imported ·
@@ -75,8 +75,8 @@
             <div class="dashboard-card step-card h-100">
                 <h6 class="fw-bold text-coop">Step 1 — Download Templates</h6>
                 <p class="small text-muted">
-                    Each file contains column headers matching the tenant database tables.
-                    Copy-paste your data starting at <strong>row 2</strong>. Keep headers unchanged.
+                    Each file matches a PostgreSQL table in this installation. Copy-paste your data
+                    starting at <strong>row 2</strong>. Keep headers unchanged.
                 </p>
                 <div class="flow-diagram mb-3">
                     {% for t in migration_tables %}
@@ -116,20 +116,14 @@
 
         <div class="col-lg-7">
             <div class="dashboard-card step-card mb-3">
-                <h6 class="fw-bold text-coop">Step 2 — Select Cooperative</h6>
+                <h6 class="fw-bold text-coop">Step 2 — Upload Data</h6>
+                {% if not coop %}
+                <div class="alert alert-warning small mb-3">
+                    Register the cooperative first before importing data.
+                </div>
+                {% endif %}
                 <form id="migrationForm" method="post" action="{{ url_for('main_routes.admin_migration_import') }}" enctype="multipart/form-data">
                     <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Cooperative Code</label>
-                            <select name="coop_slug" id="coop_slug" class="form-select form-select-sm" required>
-                                <option value="">— Select coop —</option>
-                                {% for c in coops %}
-                                <option value="{{ c.slug }}" {% if selected_coop == c.slug %}selected{% endif %}>
-                                    {{ c.slug }} — {{ c.name }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold">Import Mode</label>
                             <select name="import_mode" class="form-select form-select-sm">
@@ -179,17 +173,21 @@
     <div class="dashboard-card">
         <h6 class="fw-bold">Design Notes</h6>
         <div class="row g-3 small text-muted">
-            <div class="col-md-4">
+            <div class="col-md-6 col-lg-3">
                 <strong class="text-dark">Copy-paste workflow</strong>
                 <p class="mb-0">Coops export from Excel/Legacy systems, paste into templates, and upload without manual SQL.</p>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6 col-lg-3">
                 <strong class="text-dark">Foreign keys as codes</strong>
                 <p class="mb-0">Use <code>member_no</code>, <code>account_code</code>, and <code>entry_no</code> instead of database IDs.</p>
             </div>
-            <div class="col-md-4">
-                <strong class="text-dark">Per-coop isolation</strong>
-                <p class="mb-0">Each cooperative code routes imports to that coop&rsquo;s dedicated PostgreSQL database.</p>
+            <div class="col-md-6 col-lg-3">
+                <strong class="text-dark">Member registry (MC 2012-16)</strong>
+                <p class="mb-0"><code>04_members.xlsx</code> maps to <code>members</code>. <code>initial_paid_up_capital</code> sets share capital and opening ledger entries.</p>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <strong class="text-dark">Single cooperative</strong>
+                <p class="mb-0">Imports apply to this installation's database. <code>contact_email</code> on cooperatives syncs to <code>coop_registry</code>.</p>
             </div>
         </div>
     </div>
@@ -198,9 +196,6 @@
 <script>
 document.getElementById('previewBtn')?.addEventListener('click', async () => {
     const form = document.getElementById('migrationForm');
-    const coop = document.getElementById('coop_slug').value;
-    if (!coop) { alert('Select a cooperative code first.'); return; }
-
     const fd = new FormData(form);
     const res = await fetch('{{ url_for("main_routes.admin_migration_preview") }}', { method: 'POST', body: fd });
     const data = await res.json();

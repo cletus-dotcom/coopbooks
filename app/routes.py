@@ -1,12 +1,13 @@
 import traceback
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Blueprint, flash, jsonify, make_response, redirect, render_template, request, Response, session, url_for
 from werkzeug.utils import secure_filename
 
 from app import db
 from app.accounting_service import (
     accounts_with_balances,
+    dashboard_bundle,
     dashboard_columnar,
     dashboard_stats,
     dashboard_trends,
@@ -22,7 +23,7 @@ from app.audit_service import audit_trail_rows, log_audit
 from app.auth import platform_admin_required, register_route_guards
 from app.bir_cas_config import BIR_CAS_REQUIREMENTS
 from app.bir_cas_service import context_for_slug, documentation_index_context
-from app.config import USER_ROLES, can_post_entries, normalize_role, safe_login_redirect
+from app.config import USER_ROLES, can_post_entries, is_platform_admin_role, normalize_role, safe_login_redirect
 from app.migration_config import IMPORT_ORDER, MIGRATION_TABLES
 from app.migration_service import (
     build_all_templates_zip,
@@ -32,16 +33,20 @@ from app.migration_service import (
     validate_import,
 )
 from app.modules_config import APP_MODULES
-from app.platform_models import CoopModuleSubscription, CoopRegistry, PlatformUser
+from app.platform_models import CoopModuleSubscription, CoopRegistry
 from app.tenant_manager import (
-    coop_upload_dir,
+    get_coop_registry,
     get_current_coop,
     list_active_coops,
     normalize_slug,
-    switch_tenant_bind,
+    store_coop_logo,
 )
 from app.tenant_provisioning import provision_coop
 from app.member_service import (
+    CIVIL_STATUS_CHOICES,
+    EDUCATION_CHOICES,
+    GENDER_CHOICES,
+    MEMBERSHIP_TYPE_CHOICES,
     MEMBER_STATUSES,
     POSTABLE_TXN_TYPES,
     TXN_TYPE_LABELS,
@@ -71,26 +76,36 @@ register_route_guards(main_routes)
 
 @main_routes.route("/")
 def index():
-    try:
-        coops = list_active_coops()
-    except Exception:
-        coops = []
-    return render_template("index.html", coops=coops)
+    from app.config import database_config_error
+
+    db_error = database_config_error()
+    coops = []
+    if not db_error:
+        try:
+            coops = list_active_coops()
+        except Exception:
+            coops = []
+    return render_template("index.html", coops=coops, db_config_error=db_error)
 
 
 @main_routes.route("/api/coops")
 def api_coop_list():
-    coops = list_active_coops()
-    return jsonify([
-        {"slug": c.slug, "name": c.name}
-        for c in coops
-    ])
+    registry = get_coop_registry()
+    if not registry:
+        return jsonify([])
+    return jsonify([{"slug": registry.slug, "name": registry.name}])
 
 
-@main_routes.route("/uploads/coops/<slug>/<filename>")
-def coop_logo(slug, filename):
-    directory = coop_upload_dir(slug)
-    return send_from_directory(directory, filename)
+@main_routes.route("/coop/logo")
+def coop_logo():
+    registry = get_coop_registry()
+    if not registry or not registry.logo_data:
+        return redirect(url_for("static", filename="images/coop_logo.svg"))
+    return Response(
+        registry.logo_data,
+        mimetype=registry.logo_mime_type or "image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @main_routes.route("/logout")
@@ -103,65 +118,37 @@ def logout():
 def login():
     try:
         next_param = request.args.get("next", "")
-        coops = list_active_coops()
 
         if request.method == "POST":
             data = request.get_json() if request.is_json else request.form
             username = data.get("username", "").strip()
             password = data.get("password", "").strip()
-            coop_code = normalize_slug(data.get("coop_code", ""))
-            is_platform = data.get("platform_admin") in (True, "true", "1", "on", "yes")
             next_param = data.get("next", next_param)
 
-            if is_platform or coop_code == "platform":
-                platform_user = PlatformUser.query.filter_by(username=username).first()
-                if platform_user and platform_user.check_password(password):
-                    if (platform_user.status or "Active") != "Active":
-                        message = "Platform account is inactive."
-                        if request.is_json:
-                            return jsonify({"success": False, "message": message})
-                        flash(message, "danger")
-                        return render_template("login.html", next_url=next_param, coops=coops)
-
-                    session.clear()
-                    session["is_platform_admin"] = True
-                    session["user_id"] = platform_user.id
-                    session["username"] = platform_user.username
-                    session["fullname"] = platform_user.full_name
-                    session["role"] = "PlatformAdmin"
-                    redirect_to = url_for("main_routes.admin_coops")
-                    if request.is_json:
-                        return jsonify({"success": True, "redirect": redirect_to})
-                    flash("Platform login successful", "success")
-                    return redirect(redirect_to)
-
-            registry = CoopRegistry.query.filter_by(slug=coop_code, status="Active").first()
-            if not registry:
-                message = "Invalid or inactive cooperative code."
-                if request.is_json:
-                    return jsonify({"success": False, "message": message})
-                flash(message, "danger")
-                return render_template("login.html", next_url=next_param, coops=coops)
-
-            switch_tenant_bind(registry.slug)
             user = User.query.filter_by(username=username).first()
-
             if user and user.check_password(password):
                 if (user.status or "Active") != "Active":
                     message = "Account is inactive. Contact an administrator."
                     if request.is_json:
                         return jsonify({"success": False, "message": message})
                     flash(message, "danger")
-                    return render_template("login.html", next_url=next_param, coops=coops)
+                    return render_template("login.html", next_url=next_param)
+
+                registry = get_coop_registry()
+                if not registry and not is_platform_admin_role(user.role):
+                    message = "Cooperative is not registered yet. Contact a platform administrator."
+                    if request.is_json:
+                        return jsonify({"success": False, "message": message})
+                    flash(message, "danger")
+                    return render_template("login.html", next_url=next_param)
 
                 session.clear()
-                session["coop_slug"] = registry.slug
-                session["coop_name"] = registry.name
                 session["user_id"] = user.user_id
                 session["username"] = user.username
                 session["fullname"] = user.full_name
                 session["role"] = normalize_role(user.role)
-                session["is_platform_admin"] = False
+                if registry:
+                    session["coop_name"] = registry.name
 
                 redirect_to = safe_login_redirect(next_param)
                 if request.is_json:
@@ -174,7 +161,7 @@ def login():
                 return jsonify({"success": False, "message": message})
             flash(message, "danger")
 
-        return render_template("login.html", next_url=next_param, coops=coops)
+        return render_template("login.html", next_url=next_param)
 
     except Exception as e:
         traceback.print_exc()
@@ -192,6 +179,20 @@ def dashboard():
         coop=coop,
         can_post=can_post_entries(role),
     )
+
+
+@main_routes.route("/api/dashboard")
+def api_dashboard():
+    months = request.args.get("months", 6, type=int)
+    months = max(3, min(months, 12))
+    skip_trends = request.args.get("skip_trends", "").lower() in ("1", "true", "yes")
+    return jsonify(dashboard_bundle(
+        months=months,
+        include_trends=not skip_trends,
+        include_stats=True,
+        include_columnar=True,
+        include_journals=True,
+    ))
 
 
 @main_routes.route("/api/dashboard_stats")
@@ -267,6 +268,10 @@ def members():
         totals=totals,
         can_add=can_post_entries(role),
         member_statuses=MEMBER_STATUSES,
+        membership_types=MEMBERSHIP_TYPE_CHOICES,
+        genders=GENDER_CHOICES,
+        civil_statuses=CIVIL_STATUS_CHOICES,
+        education_levels=EDUCATION_CHOICES,
         next_member_no=next_member_no(),
         default_date=local_time().date().isoformat(),
         ledger_summaries=ledger_summaries,
@@ -647,6 +652,10 @@ def admin_coops():
 @main_routes.route("/admin/coops/register", methods=["GET", "POST"])
 @platform_admin_required
 def admin_coops_register():
+    if get_coop_registry():
+        flash("A cooperative is already registered. Open Cooperative Settings to update it.", "info")
+        return redirect(url_for("main_routes.admin_coops"))
+
     if request.method == "POST":
         form = request.form.to_dict(flat=False)
         data = {k: (v[0] if isinstance(v, list) else v) for k, v in form.items()}
@@ -668,10 +677,10 @@ def admin_coops_register():
 @main_routes.route("/admin/migration")
 @platform_admin_required
 def admin_migration():
-    coops = CoopRegistry.query.order_by(CoopRegistry.name).all()
+    registry = get_coop_registry()
     return render_template(
         "admin/migration.html",
-        coops=coops,
+        coop=registry,
         migration_tables=IMPORT_ORDER,
     )
 
@@ -705,10 +714,9 @@ def admin_migration_templates_zip():
 @main_routes.route("/admin/migration/preview", methods=["POST"])
 @platform_admin_required
 def admin_migration_preview():
-    coop_slug = normalize_slug(request.form.get("coop_slug", ""))
-    registry = CoopRegistry.query.filter_by(slug=coop_slug).first()
+    registry = get_coop_registry()
     if not registry:
-        return jsonify({"status": "error", "msg": "Invalid cooperative code."}), 400
+        return jsonify({"status": "error", "msg": "Register the cooperative first."}), 400
 
     previews = []
     for spec in IMPORT_ORDER:
@@ -717,15 +725,17 @@ def admin_migration_preview():
             continue
         rows, errors = read_upload_rows(file, spec["key"])
         fk_warnings = []
+        row_errors = []
         if rows and not errors:
-            val = validate_import(coop_slug, spec["key"], rows)
-            fk_warnings = val.get("errors", [])
+            val = validate_import(spec["key"], rows)
+            fk_warnings = val.get("warnings", [])
+            row_errors = val.get("errors", [])
         previews.append({
             "key": spec["key"],
             "label": spec["label"],
             "filename": file.filename,
             "row_count": len(rows),
-            "errors": errors,
+            "errors": errors + row_errors,
             "warnings": fk_warnings,
             "sample": [{k: v for k, v in r.items() if k != "_row"} for r in rows[:3]] if rows else [],
         })
@@ -739,10 +749,9 @@ def admin_migration_preview():
 @main_routes.route("/admin/migration/import", methods=["POST"])
 @platform_admin_required
 def admin_migration_import():
-    coop_slug = normalize_slug(request.form.get("coop_slug", ""))
-    registry = CoopRegistry.query.filter_by(slug=coop_slug).first()
+    registry = get_coop_registry()
     if not registry:
-        flash("Invalid cooperative code.", "danger")
+        flash("Register the cooperative before importing data.", "danger")
         return redirect(url_for("main_routes.admin_migration"))
 
     mode = request.form.get("import_mode", "append")
@@ -759,16 +768,15 @@ def admin_migration_import():
         flash("Select at least one Excel file to import.", "warning")
         return redirect(url_for("main_routes.admin_migration"))
 
-    results = import_batch(coop_slug, uploads, mode=mode)
+    results = import_batch(uploads, mode=mode)
     total_imported = sum(r.get("imported", 0) for r in results)
     total_errors = sum(len(r.get("errors", [])) for r in results)
 
     return render_template(
         "admin/migration.html",
-        coops=CoopRegistry.query.order_by(CoopRegistry.name).all(),
+        coop=registry,
         migration_tables=IMPORT_ORDER,
         import_results=results,
-        selected_coop=coop_slug,
         import_mode=mode,
         total_imported=total_imported,
         total_errors=total_errors,
@@ -806,10 +814,7 @@ def admin_coop_detail(slug):
                 if ext not in ("png", "jpg", "jpeg", "svg", "webp", "gif"):
                     flash("Logo must be PNG, JPG, SVG, or WebP.", "danger")
                 else:
-                    filename = f"logo.{ext}"
-                    path = coop_upload_dir(slug)
-                    file.save(path / filename)
-                    coop.logo_filename = filename
+                    store_coop_logo(coop, file.read(), secure_filename(file.filename))
                     db.session.commit()
                     flash("Logo uploaded.", "success")
         return redirect(url_for("main_routes.admin_coop_detail", slug=slug))
@@ -836,7 +841,11 @@ def admin_users():
 
 @main_routes.route("/admin/users/add", methods=["POST"])
 def admin_users_add():
-    parsed, error = parse_user_form(request.form, require_password=True)
+    parsed, error = parse_user_form(
+        request.form,
+        require_password=True,
+        current_role=session.get("role"),
+    )
     if error:
         return jsonify({"status": "error", "msg": error}), 400
 
@@ -854,7 +863,12 @@ def admin_users_update(user_id):
     if not user:
         return jsonify({"status": "error", "msg": "User not found."}), 404
 
-    parsed, error = parse_user_form(request.form, user_id=user_id, require_password=False)
+    parsed, error = parse_user_form(
+        request.form,
+        user_id=user_id,
+        require_password=False,
+        current_role=session.get("role"),
+    )
     if error:
         return jsonify({"status": "error", "msg": error}), 400
 

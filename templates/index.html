@@ -146,6 +146,12 @@
 
 {% block body %}
 <div class="landing">
+    {% if db_config_error %}
+    <div class="alert alert-danger mx-3 mt-3 mb-0" role="alert">
+        <strong>Database not connected.</strong> {{ db_config_error }}
+        Set the Supabase <em>Transaction pooler</em> URL (port 6543) in Vercel environment variables, then redeploy.
+    </div>
+    {% endif %}
     <header class="hero">
         <div class="hero-inner">
             <div class="hero-brand">

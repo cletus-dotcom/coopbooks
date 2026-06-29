@@ -1,6 +1,4 @@
-"""Platform registry models — stored in the master database."""
-
-from werkzeug.security import check_password_hash, generate_password_hash
+"""Cooperative registry and module subscription models."""
 
 from app import db
 from app.models import local_time
@@ -23,6 +21,8 @@ class CoopRegistry(db.Model):
     address = db.Column(db.String(255))
     fiscal_year_end = db.Column(db.String(20), default="December 31")
     logo_filename = db.Column(db.String(120))
+    logo_data = db.Column(db.LargeBinary)
+    logo_mime_type = db.Column(db.String(80))
     contact_email = db.Column(db.String(120))
     created_at = db.Column(db.DateTime, default=local_time)
 
@@ -57,20 +57,4 @@ class CoopModuleSubscription(db.Model):
     )
 
 
-class PlatformUser(db.Model):
-    """Platform-level administrator (manages coop registration)."""
-
-    __tablename__ = "platform_users"
-
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    full_name = db.Column(db.String(150))
-    email = db.Column(db.String(120))
-    status = db.Column(db.String(20), default="Active")
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+# PlatformUser removed — use User.role == "PlatformAdmin" instead.

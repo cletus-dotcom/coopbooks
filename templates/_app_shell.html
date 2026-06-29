@@ -11,6 +11,62 @@
     html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
     body { background: linear-gradient(165deg, #f8fbf8 0%, #e8f5e9 100%); }
     body.no-scroll { overflow: hidden; }
+    /* Bootstrap modals must sit above fixed topbar (1300) and sidebar (1200) */
+    .modal-backdrop { z-index: 1340 !important; }
+    .modal { z-index: 1350 !important; }
+    /* Scrollable form modals — centered + scrollable needs an explicit height chain */
+    .modal-dialog.modal-dialog-scrollable {
+        max-height: calc(100dvh - 2rem);
+    }
+    .modal-dialog.modal-dialog-scrollable.modal-dialog-centered {
+        display: flex;
+        align-items: center;
+        min-height: calc(100dvh - 2rem);
+        max-height: calc(100dvh - 2rem);
+        margin: 1rem auto;
+    }
+    .modal-dialog.modal-dialog-scrollable .modal-content {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100dvh - 2rem);
+        overflow: hidden;
+        width: 100%;
+    }
+    .modal-dialog.modal-dialog-scrollable .modal-content > form {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+    .modal-dialog.modal-dialog-scrollable .modal-body {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+    .modal-dialog.modal-dialog-scrollable .modal-header,
+    .modal-dialog.modal-dialog-scrollable .modal-footer {
+        flex-shrink: 0;
+    }
+    @media (max-width: 767.98px) {
+        .modal-dialog.modal-dialog-scrollable {
+            margin: 0.75rem auto;
+            width: calc(100% - 1.5rem);
+            max-width: none;
+            height: calc(100dvh - 1.5rem);
+            max-height: calc(100dvh - 1.5rem);
+        }
+        .modal-dialog.modal-dialog-scrollable.modal-dialog-centered {
+            align-items: stretch;
+            min-height: 0;
+        }
+        .modal-dialog.modal-dialog-scrollable .modal-content {
+            height: 100%;
+            max-height: 100%;
+        }
+    }
     body.sidebar-open::before {
         content: ""; position: fixed; inset: 0;
         background: rgba(0,0,0,0.4); z-index: 1100;
@@ -168,14 +224,6 @@
 </header>
 
 <aside id="sidebar" class="sidebar">
-    {% if is_platform_admin %}
-    <p class="sidebar-label">Platform</p>
-    <ul class="sidebar-nav">
-        <li><a href="{{ url_for('main_routes.admin_coops') }}" class="{{ 'active' if active_nav == 'coops' else '' }}"><i class="bi bi-building"></i> Coop Registry</a></li>
-        <li><a href="{{ url_for('main_routes.admin_coops_register') }}" class="{{ 'active' if active_nav == 'coops_register' else '' }}"><i class="bi bi-plus-circle"></i> Register Coop</a></li>
-        <li><a href="{{ url_for('main_routes.admin_migration') }}" class="{{ 'active' if active_nav == 'migration' else '' }}"><i class="bi bi-database-down"></i> Migration Tool</a></li>
-    </ul>
-    {% else %}
     <p class="sidebar-label">Accounting</p>
     <ul class="sidebar-nav">
         {% if 'dashboard' in subscribed_modules %}
@@ -236,9 +284,7 @@
         </a>
     </div>
     {% endif %}
-    {% endif %}
 
-    {% if not is_platform_admin %}
     <hr class="sidebar-divider">
     <p class="sidebar-label">About</p>
     <ul class="sidebar-nav">
@@ -255,9 +301,8 @@
             <i class="bi bi-book"></i> User Manual
         </a>
     </div>
-    {% endif %}
 
-    {% if is_admin_role(session.get('role')) and not is_platform_admin %}
+    {% if is_platform_admin_role(session.get('role')) or is_admin_role(session.get('role')) %}
     <hr class="sidebar-divider">
     <p class="sidebar-label">Administration</p>
     <ul class="sidebar-nav">
@@ -268,8 +313,24 @@
             </button>
         </li>
     </ul>
-    <div id="adminSubMenu" class="{{ '' if active_nav in ('users', 'coops') else 'd-none' }}">
-        {% if 'admin_users' in subscribed_modules %}
+    <div id="adminSubMenu" class="{{ '' if active_nav in ('users', 'coops', 'coops_register', 'migration') else 'd-none' }}">
+        {% if is_platform_admin_role(session.get('role')) %}
+        <a href="{{ url_for('main_routes.admin_coops') }}"
+           class="sidebar-sublink {{ 'active' if active_nav == 'coops' else '' }}">
+            <i class="bi bi-building"></i> Cooperative Settings
+        </a>
+        {% if not coop_registry %}
+        <a href="{{ url_for('main_routes.admin_coops_register') }}"
+           class="sidebar-sublink {{ 'active' if active_nav == 'coops_register' else '' }}">
+            <i class="bi bi-plus-circle"></i> Register Cooperative
+        </a>
+        {% endif %}
+        <a href="{{ url_for('main_routes.admin_migration') }}"
+           class="sidebar-sublink {{ 'active' if active_nav == 'migration' else '' }}">
+            <i class="bi bi-database-down"></i> Migration Tool
+        </a>
+        {% endif %}
+        {% if is_admin_role(session.get('role')) and 'admin_users' in subscribed_modules %}
         <a href="{{ url_for('main_routes.admin_users') }}"
            class="sidebar-sublink {{ 'active' if active_nav == 'users' else '' }}">
             <i class="bi bi-person-gear"></i> User Management
@@ -358,6 +419,12 @@ document.addEventListener('DOMContentLoaded', () => {
             aboutChevron.classList.toggle('bi-chevron-down');
             aboutChevron.classList.toggle('bi-chevron-up');
         }
+    });
+
+    document.querySelectorAll('.modal').forEach(modalEl => {
+        modalEl.addEventListener('show.bs.modal', () => {
+            closeSidebar();
+        });
     });
 });
 </script>

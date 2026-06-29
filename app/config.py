@@ -42,36 +42,67 @@ def _uri_with_db_name(uri, db_name):
     )
 
 
+def _is_supabase_direct_url(url):
+    if not url:
+        return False
+    lowered = url.lower()
+    return "db." in lowered and ".supabase.co" in lowered and "pooler.supabase.com" not in lowered
+
+
+def _is_supabase_pooler_url(url):
+    if not url:
+        return False
+    lowered = url.lower()
+    return "pooler.supabase.com" in lowered or ":6543/" in lowered or lowered.rstrip().endswith(":6543")
+
+
 def _effective_database_url():
     """Prefer pooler URL on Vercel/serverless (required for Supabase)."""
+    import logging
+
+    logger = logging.getLogger(__name__)
     pooler = os.getenv("DATABASE_POOLER_URL")
     direct = os.getenv("DATABASE_URL")
-    if is_serverless_host() and pooler:
+
+    if pooler:
         return pooler
-    if is_serverless_host() and direct and "db." in direct and ".supabase.co" in direct:
-        import logging
-        logging.getLogger(__name__).warning(
-            "DATABASE_URL uses Supabase direct host (db.*.supabase.co). "
-            "Vercel requires the Supabase pooler URL on port 6543 — set DATABASE_POOLER_URL."
+    if direct and _is_supabase_pooler_url(direct):
+        return direct
+    if is_serverless_host() and direct and _is_supabase_direct_url(direct):
+        logger.error(
+            "DATABASE_URL uses Supabase direct host (db.*.supabase.co:5432) which fails on Vercel. "
+            "In Vercel env vars, REPLACE DATABASE_URL with the Supabase Transaction pooler URI "
+            "(host: aws-0-*.pooler.supabase.com, port 6543), or set DATABASE_POOLER_URL."
         )
+        return None
     return direct
 
 
-def build_database_uri(db_name=None):
-    target = db_name or DB_CONFIG["db_name"]
-    platform_name = DB_CONFIG["platform_db_name"]
-    tenant_url = _effective_database_url()
-    platform_url = os.getenv("PLATFORM_DATABASE_URL") or os.getenv("PLATFORM_DATABASE_POOLER_URL")
+def database_config_error():
+    """Human-readable message when serverless DB env is misconfigured."""
+    if not is_serverless_host():
+        return None
+    url = _effective_database_url()
+    if url:
+        return None
+    if os.getenv("DATABASE_URL") and _is_supabase_direct_url(os.getenv("DATABASE_URL")):
+        return (
+            "Database misconfigured: use Supabase pooler URL (port 6543), not db.*.supabase.co."
+        )
+    if not os.getenv("DATABASE_URL") and not os.getenv("DATABASE_POOLER_URL"):
+        return "Database misconfigured: set DATABASE_URL to your Supabase pooler connection string."
+    return None
 
-    if platform_url and target == platform_name:
-        return _normalize_sqlalchemy_uri(platform_url)
-    if tenant_url and not platform_url:
-        # Single hosted DB (e.g. Supabase): platform + tenant tables share one database.
-        return _normalize_sqlalchemy_uri(tenant_url)
-    if tenant_url and target == DB_CONFIG["db_name"]:
-        return _normalize_sqlalchemy_uri(tenant_url)
-    if tenant_url and target == platform_name:
-        return _uri_with_db_name(_normalize_sqlalchemy_uri(tenant_url), platform_name)
+
+def build_database_uri(db_name=None):
+    """Single-database URI for this installation."""
+    url = _effective_database_url()
+    if url:
+        return _normalize_sqlalchemy_uri(url)
+
+    target = db_name or DB_CONFIG["db_name"]
+    if is_serverless_host():
+        return "postgresql+psycopg2://127.0.0.1:1/__misconfigured__"
 
     return (
         f"postgresql+psycopg2://{quote(DB_CONFIG['db_user'], safe='')}:"
@@ -94,12 +125,28 @@ def sqlalchemy_engine_options():
     return opts
 
 
+def is_platform_admin_role(role=None):
+    return (role or "").strip().lower() == "platformadmin"
+
+
 def is_platform_admin_session(session_obj):
-    return bool(session_obj.get("is_platform_admin"))
+    return is_platform_admin_role(session_obj.get("role"))
 
 
-def can_manage_coops(session_obj):
-    return is_platform_admin_session(session_obj)
+def can_manage_coops(session_obj=None, role=None):
+    if session_obj is not None and role is None:
+        role = session_obj.get("role")
+    return is_platform_admin_role(role)
+
+
+ASSIGNABLE_ROLES = ["Admin", "Staff", "Member"]
+ALL_USER_ROLES = ["PlatformAdmin"] + ASSIGNABLE_ROLES
+
+
+def assignable_user_roles(current_role):
+    if is_platform_admin_role(current_role):
+        return list(ALL_USER_ROLES)
+    return list(ASSIGNABLE_ROLES)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "coop_cda_secret_key")
 
@@ -140,23 +187,27 @@ CDA_REPORT_FORMS = [
 
 
 def normalize_role(role):
-    value = (role or "Member").strip().capitalize()
+    value = (role or "Member").strip()
+    if value.lower() == "platformadmin":
+        return "PlatformAdmin"
+    value = value.capitalize()
     legacy = {"Bookkeeper": "Staff", "Viewer": "Member", "Employee": "Member", "User": "Member"}
     if value in legacy:
         return legacy[value]
-    return value if value in USER_ROLES else "Member"
+    return value if value in ALL_USER_ROLES else "Member"
 
 
 def is_valid_user_role(role):
-    return normalize_role(role) in USER_ROLES
+    return normalize_role(role) in ALL_USER_ROLES
 
 
 def is_admin_role(role=None):
-    return normalize_role(role).lower() == "admin"
+    return normalize_role(role) == "Admin"
 
 
 def can_post_entries(role=None):
-    return normalize_role(role).lower() in ("admin", "staff")
+    normalized = normalize_role(role)
+    return normalized in ("Admin", "Staff", "PlatformAdmin")
 
 
 def safe_login_redirect(next_param, default_endpoint="main_routes.dashboard"):

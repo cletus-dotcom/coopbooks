@@ -1,4 +1,29 @@
-"""Migration import templates — column definitions aligned with tenant database tables."""
+"""Migration import templates — columns aligned with PostgreSQL tables in this installation."""
+
+from app.member_registry_config import (
+    CIVIL_STATUSES,
+    EDUCATION_LEVELS,
+    GENDERS,
+    MEMBER_STATUSES,
+    MEMBERSHIP_TYPES,
+)
+
+# Maps template keys to physical tables (single shared database).
+MIGRATION_DB_TABLES = {
+    "cooperatives": "cooperatives",
+    "accounts": "accounts",
+    "users": "users",
+    "members": "members",
+    "journal_entries": "journal_entries",
+    "journal_lines": "journal_lines",
+    "member_ledger": "member_ledger",
+}
+
+ACCOUNT_TYPES = ("Asset", "Liability", "Equity", "Revenue", "Expense")
+NORMAL_BALANCES = ("Debit", "Credit")
+LEDGER_TYPES = ("share", "savings", "loan")
+USER_ROLES_IMPORT = ("PlatformAdmin", "Admin", "Staff", "Member")
+USER_STATUSES = ("Active", "Inactive")
 
 MIGRATION_TABLES = [
     {
@@ -7,16 +32,20 @@ MIGRATION_TABLES = [
         "filename": "01_cooperatives.xlsx",
         "sheet": "cooperatives",
         "order": 1,
-        "description": "One row — cooperative profile stored in the tenant database.",
+        "db_table": "cooperatives",
+        "description": (
+            "One row — cooperative profile (cooperatives table). Also updates coop_registry "
+            "for this installation (including contact_email). created_at is set automatically."
+        ),
         "headers": [
             "name", "registration_no", "tin", "rdo", "coop_type",
-            "address", "fiscal_year_end",
+            "address", "fiscal_year_end", "contact_email",
         ],
         "required": ["name"],
         "example": [
             "Sample Primary Multi-Purpose Cooperative", "CDA-XXXX-XXXXX",
             "123-456-789-000", "RDO 39", "Primary Multi-Purpose Cooperative",
-            "Manila, Philippines", "December 31",
+            "Manila, Philippines", "December 31", "info@samplecoop.local",
         ],
     },
     {
@@ -25,7 +54,11 @@ MIGRATION_TABLES = [
         "filename": "02_accounts.xlsx",
         "sheet": "accounts",
         "order": 2,
-        "description": "CDA chart of accounts. account_type: Asset, Liability, Equity, Revenue, Expense.",
+        "db_table": "accounts",
+        "description": (
+            "CDA chart of accounts. account_type: Asset, Liability, Equity, Revenue, Expense. "
+            "normal_balance: Debit or Credit. is_active: TRUE/FALSE."
+        ),
         "headers": [
             "code", "name", "account_type", "category", "normal_balance", "is_active",
         ],
@@ -40,7 +73,12 @@ MIGRATION_TABLES = [
         "filename": "03_users.xlsx",
         "sheet": "users",
         "order": 3,
-        "description": "Login users. role: Admin, Staff, Member. password is hashed on import.",
+        "db_table": "users",
+        "description": (
+            "Login users (users table). role: PlatformAdmin, Admin, Staff, or Member. "
+            "password is hashed on import (stored as password_hash). "
+            "PlatformAdmin accounts are never deleted by replace mode."
+        ),
         "headers": [
             "username", "full_name", "email", "role", "status", "password",
         ],
@@ -55,15 +93,40 @@ MIGRATION_TABLES = [
         "filename": "04_members.xlsx",
         "sheet": "members",
         "order": 4,
-        "description": "Member registry. membership_date format: YYYY-MM-DD. status: Active or Inactive.",
+        "db_table": "members",
+        "description": (
+            "CDA MC 2012-16 membership registry (members table). "
+            "membership_date = date accepted (I-a). "
+            "initial_paid_up_capital sets share_capital on import; optional savings_balance "
+            "creates opening member ledger entries. full_name is computed from name parts. "
+            "Dates: YYYY-MM-DD. status: Active, Inactive, or Terminated."
+        ),
+        "valid_values": {
+            "membership_type": MEMBERSHIP_TYPES,
+            "gender": GENDERS,
+            "civil_status": CIVIL_STATUSES,
+            "highest_education": EDUCATION_LEVELS,
+            "status": MEMBER_STATUSES,
+        },
         "headers": [
-            "member_no", "full_name", "email", "phone", "address",
-            "membership_date", "share_capital", "savings_balance", "status",
+            "member_no", "last_name", "first_name", "middle_name", "tin",
+            "membership_date", "bod_acceptance_resolution", "membership_type",
+            "initial_shares", "initial_subscription_amount", "initial_paid_up_capital",
+            "address", "birth_date", "gender", "civil_status", "highest_education",
+            "occupation_income_source", "number_of_dependents",
+            "religion_social_affiliation", "annual_income",
+            "register_entry_date", "email", "phone", "savings_balance", "status",
+            "termination_date", "termination_bod_resolution",
         ],
-        "required": ["member_no", "full_name"],
+        "required": ["member_no", "last_name", "first_name", "tin", "membership_date"],
         "example": [
-            "M-001", "Maria Santos", "maria@email.com", "09171234567",
-            "Quezon City", "2024-01-15", "5000", "2500", "Active",
+            "M-001", "Santos", "Maria", "L.", "123-456-789-000",
+            "2024-01-15", "BOD-2024-01", "Regular",
+            "50", "5000", "5000",
+            "123 Main St, Quezon City", "1990-05-20", "Female", "Single", "College",
+            "Teacher", "2", "Roman Catholic", "360000",
+            "2024-01-15", "maria@email.com", "09171234567", "2500", "Active",
+            "", "",
         ],
     },
     {
@@ -72,7 +135,8 @@ MIGRATION_TABLES = [
         "filename": "05_journal_entries.xlsx",
         "sheet": "journal_entries",
         "order": 5,
-        "description": "General journal headers. entry_date format: YYYY-MM-DD.",
+        "db_table": "journal_entries",
+        "description": "General journal headers (journal_entries). entry_date: YYYY-MM-DD.",
         "headers": [
             "entry_no", "entry_date", "description", "reference", "posted_by",
         ],
@@ -87,7 +151,11 @@ MIGRATION_TABLES = [
         "filename": "06_journal_lines.xlsx",
         "sheet": "journal_lines",
         "order": 6,
-        "description": "Journal detail lines. Use entry_no and account_code (not database IDs).",
+        "db_table": "journal_lines",
+        "description": (
+            "Journal detail lines (journal_lines). Resolves entry_no → entry_id and "
+            "account_code → account_id. debit/credit are numeric."
+        ),
         "headers": [
             "entry_no", "account_code", "debit", "credit", "memo",
         ],
@@ -102,18 +170,20 @@ MIGRATION_TABLES = [
         "filename": "07_member_ledger.xlsx",
         "sheet": "member_ledger",
         "order": 7,
+        "db_table": "member_ledger",
         "description": (
-            "Member subsidiary transactions. txn_type examples: SHARE_SUBSCRIPTION, "
-            "SAVINGS_DEPOSIT, LOAN_RELEASE. ledger_type: share, savings, loan."
+            "Member subsidiary ledger (member_ledger). txn_type examples: SHARE_SUBSCRIPTION, "
+            "SAVINGS_DEPOSIT, LOAN_RELEASE. ledger_type: share, savings, or loan. "
+            "Optional entry_no links journal_entry_id."
         ),
         "headers": [
             "member_no", "txn_date", "txn_type", "ledger_type",
-            "reference", "description", "debit", "credit", "posted_by",
+            "reference", "description", "entry_no", "debit", "credit", "posted_by",
         ],
         "required": ["member_no", "txn_date", "txn_type", "ledger_type"],
         "example": [
             "M-001", "2025-01-20", "SAVINGS_DEPOSIT", "savings",
-            "OR-2001", "Monthly savings", "0", "500", "Staff",
+            "OR-2001", "Monthly savings", "", "0", "500", "Staff",
         ],
     },
 ]
