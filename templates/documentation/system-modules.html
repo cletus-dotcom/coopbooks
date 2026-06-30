@@ -1,10 +1,11 @@
 {% extends "documentation/_doc_base.html" %}
 {% block doc_content %}
-<p class="small">Annex A-3 Part III — List of Modules per software/system</p>
+<p class="small">Annex A-3 Part III — List of modules for {{ system_name }} v{{ system_version }}</p>
+<p class="small text-muted">Modules marked as subscription may be enabled per cooperative agreement. Core accounting modules are always active.</p>
 <div class="table-responsive">
     <table class="table table-sm table-hover">
         <thead class="table-success">
-            <tr><th>Module</th><th>Description</th><th>Route</th><th>BIR Classification</th></tr>
+            <tr><th>Module</th><th>Description</th><th>Route</th><th>BIR Classification</th><th></th></tr>
         </thead>
         <tbody>
             {% for m in modules %}
@@ -13,6 +14,13 @@
                 <td class="small">{{ m.description }}</td>
                 <td><code>{{ m.route }}</code></td>
                 <td class="small">{{ m.bir_module }}</td>
+                <td class="small">
+                    {% if m.subscription is defined and m.subscription %}
+                    <span class="badge text-bg-light border">Subscription</span>
+                    {% elif m.subscription is defined %}
+                    <span class="badge text-bg-success">Core</span>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

@@ -345,7 +345,7 @@
         <li><a href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
     </ul>
     <div class="sidebar-footer">
-        <img src="{{ coop_logo_url }}" alt="CoopBooks" class="sidebar-logo">
+        <img src="{{ coop_logo_url }}" alt="{{ session.get('coop_name') or 'Cooperative' }}" class="sidebar-logo">
         <div class="text-white-50 small mt-2">&copy; {{ session.get('coop_name') or 'CoopBooks' }}</div>
     </div>
 </aside>

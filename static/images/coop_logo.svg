@@ -1,12 +1,90 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Cooperative logo">
-  <circle cx="60" cy="60" r="58" fill="#1B5E20"/>
-  <circle cx="60" cy="60" r="48" fill="#2E7D32"/>
-  <g fill="#F9A825">
-    <circle cx="60" cy="38" r="10"/>
-    <circle cx="38" cy="62" r="10"/>
-    <circle cx="82" cy="62" r="10"/>
-    <circle cx="48" cy="84" r="10"/>
-    <circle cx="72" cy="84" r="10"/>
+  <defs>
+    <filter id="logoShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4.5" flood-color="#0D3B12" flood-opacity="0.38"/>
+    </filter>
+    <filter id="nodeShadow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="2" stdDeviation="1.8" flood-color="#4A5D12" flood-opacity="0.45"/>
+    </filter>
+    <linearGradient id="ringGrad" x1="18%" y1="12%" x2="88%" y2="92%">
+      <stop offset="0%" stop-color="#388E3C"/>
+      <stop offset="45%" stop-color="#1B5E20"/>
+      <stop offset="100%" stop-color="#0A2E0D"/>
+    </linearGradient>
+    <linearGradient id="goldRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082"/>
+      <stop offset="35%" stop-color="#F9A825"/>
+      <stop offset="70%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#A67C00"/>
+    </linearGradient>
+    <radialGradient id="innerDisc" cx="38%" cy="32%" r="72%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="72%" stop-color="#FAFAFA"/>
+      <stop offset="100%" stop-color="#ECEFF1"/>
+    </radialGradient>
+    <radialGradient id="nodeGrad" cx="32%" cy="28%" r="68%">
+      <stop offset="0%" stop-color="#F0E6A8"/>
+      <stop offset="38%" stop-color="#D4AF37"/>
+      <stop offset="72%" stop-color="#9CAF2E"/>
+      <stop offset="100%" stop-color="#558B2F"/>
+    </radialGradient>
+    <linearGradient id="pentagonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#43A047"/>
+      <stop offset="100%" stop-color="#1B5E20"/>
+    </linearGradient>
+    <linearGradient id="ringHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#logoShadow)">
+    <!-- Gold outer outline -->
+    <circle cx="60" cy="60" r="58.5" fill="none" stroke="url(#goldRing)" stroke-width="2"/>
+
+    <!-- Dark green ring (3D bevel) -->
+    <circle cx="60" cy="60" r="56" fill="url(#ringGrad)"/>
+    <circle cx="60" cy="60" r="56" fill="url(#ringHighlight)"/>
+    <circle cx="60" cy="60" r="56" fill="none" stroke="#0D3B12" stroke-width="1" stroke-opacity="0.35"/>
+
+    <!-- White inner field -->
+    <circle cx="60" cy="60" r="45.5" fill="url(#innerDisc)"/>
+    <circle cx="60" cy="60" r="45.5" fill="none" stroke="url(#goldRing)" stroke-width="1.6"/>
+
+    <!-- Five member nodes — green-gold spheres -->
+    <g filter="url(#nodeShadow)">
+      <circle cx="60" cy="38" r="10" fill="url(#nodeGrad)"/>
+      <circle cx="38" cy="62" r="10" fill="url(#nodeGrad)"/>
+      <circle cx="82" cy="62" r="10" fill="url(#nodeGrad)"/>
+      <circle cx="48" cy="84" r="10" fill="url(#nodeGrad)"/>
+      <circle cx="72" cy="84" r="10" fill="url(#nodeGrad)"/>
+    </g>
+    <!-- Specular highlights on nodes -->
+    <g fill="#FFFFFF" opacity="0.55">
+      <ellipse cx="57" cy="35" rx="3.2" ry="2" transform="rotate(-18 57 35)"/>
+      <ellipse cx="35" cy="59" rx="3.2" ry="2" transform="rotate(-18 35 59)"/>
+      <ellipse cx="79" cy="59" rx="3.2" ry="2" transform="rotate(-18 79 59)"/>
+      <ellipse cx="45" cy="81" rx="3.2" ry="2" transform="rotate(-18 45 81)"/>
+      <ellipse cx="69" cy="81" rx="3.2" ry="2" transform="rotate(-18 69 81)"/>
+    </g>
+
+    <!-- Green pentagon (in front of nodes) -->
+    <path
+      d="M60 48 L38 62 L48 84 L72 84 L82 62 Z"
+      fill="none"
+      stroke="#0D3B12"
+      stroke-width="4.2"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+      opacity="0.22"
+    />
+    <path
+      d="M60 48 L38 62 L48 84 L72 84 L82 62 Z"
+      fill="none"
+      stroke="url(#pentagonGrad)"
+      stroke-width="3"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
   </g>
-  <path d="M60 48 L38 62 L48 84 L72 84 L82 62 Z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
 </svg>

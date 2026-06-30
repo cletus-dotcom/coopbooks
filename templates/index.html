@@ -19,7 +19,7 @@
         inset: 0;
         background:
             radial-gradient(ellipse 70% 50% at 50% -10%, rgba(27, 94, 32, 0.08) 0%, transparent 70%),
-            radial-gradient(ellipse 40% 30% at 90% 80%, rgba(249, 168, 37, 0.06) 0%, transparent 60%);
+            radial-gradient(ellipse 40% 30% at 90% 80%, rgba(212, 175, 55, 0.08) 0%, transparent 60%);
         pointer-events: none;
     }
     .hero-inner { position: relative; max-width: 860px; margin: 0 auto; }
@@ -27,6 +27,7 @@
     .logo-wrap {
         width: 110px; height: 110px; margin-bottom: 0.65rem;
         display: flex; align-items: center; justify-content: center;
+        filter: drop-shadow(0 8px 14px rgba(13, 59, 18, 0.22));
     }
     .logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
     .hero-subtitle {
@@ -156,7 +157,7 @@
         <div class="hero-inner">
             <div class="hero-brand">
                 <div class="logo-wrap">
-                    <img src="{{ url_for('static', filename='images/coop_logo.svg') }}" alt="CoopBooks Logo">
+                    <img src="{{ brand_logo_url }}" alt="CoopBooks Logo">
                 </div>
                 <p class="hero-subtitle">Philippine Cooperative Accounting</p>
             </div>

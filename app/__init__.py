@@ -33,7 +33,7 @@ db = SQLAlchemy()
 log = logging.getLogger(__name__)
 
 from app.platform_models import CoopModuleSubscription, CoopRegistry  # noqa: F401, E402
-from app.tenant_manager import coop_logo_url, get_coop_registry, subscribed_module_keys  # noqa: F401, E402
+from app.tenant_manager import brand_logo_url, coop_logo_url, get_coop_registry, subscribed_module_keys  # noqa: F401, E402
 import app.models  # noqa: F401, E402
 
 
@@ -92,6 +92,7 @@ def create_app():
             "subscribed_modules": set(modules),
             "nav_module_items": nav_modules(modules),
             "coop_registry": registry,
+            "brand_logo_url": brand_logo_url(),
             "coop_logo_url": coop_logo_url(registry),
             "db_config_error": database_config_error(),
         }

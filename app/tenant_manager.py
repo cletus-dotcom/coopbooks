@@ -1,6 +1,7 @@
 """Single-tenant cooperative context and registry helpers."""
 
 import re
+from io import BytesIO
 
 from flask import url_for
 
@@ -8,6 +9,8 @@ from app.modules_config import APP_MODULES, default_module_keys
 from app.platform_models import CoopModuleSubscription, CoopRegistry
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$")
+
+BRAND_LOGO_STATIC = "images/coop_logo.svg"
 
 LOGO_MIME_BY_EXT = {
     "png": "image/png",
@@ -116,10 +119,28 @@ def coop_has_logo(registry=None):
     return bool(registry and registry.logo_data)
 
 
+def brand_logo_url():
+    """CoopBooks product logo (always the default SVG). Used on landing/login."""
+    return url_for("static", filename=BRAND_LOGO_STATIC)
+
+
 def coop_logo_url(registry=None):
+    """Cooperative logo for sidebar — uploaded image when set, else brand SVG."""
+    registry = registry or get_coop_registry()
     if coop_has_logo(registry):
         return url_for("main_routes.coop_logo")
-    return url_for("static", filename="images/coop_logo.svg")
+    return brand_logo_url()
+
+
+def coop_logo_image_stream(registry=None):
+    """
+    Uploaded cooperative logo bytes for PDF embedding.
+    Returns None when no cooperative logo has been uploaded (never the brand SVG).
+    """
+    registry = registry or get_coop_registry()
+    if not registry or not registry.logo_data:
+        return None
+    return BytesIO(registry.logo_data)
 
 
 def store_coop_logo(registry, file_bytes, filename):

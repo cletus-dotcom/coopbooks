@@ -28,7 +28,11 @@ from app.accounting_service import (
 from app.bir_cas_config import SYSTEM_NAME, SYSTEM_VERSION
 from app.bir_cas_service import pdf_data_for_slug
 from app.models import local_time
-from app.tenant_manager import get_coop_registry, get_current_coop
+from app.tenant_manager import (
+    coop_logo_image_stream,
+    get_coop_registry,
+    get_current_coop,
+)
 
 BIR_BOOK_TYPES = frozenset({
     "general-journal",
@@ -52,6 +56,12 @@ HEADER_GAP_AFTER_SEP = 0.06 * inch
 HEADER_LOGO_COL_WIDTH = 0.95 * inch
 HEADER_RIGHT_COL_WIDTH = 2.05 * inch
 RASTER_LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+RASTER_LOGO_MIMES = {
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+}
 
 
 def _styles():
@@ -178,11 +188,56 @@ def _active_registry():
 
 
 def _resolve_logo_path(registry):
-    if registry and registry.logo_data:
-        ext = (registry.logo_filename or "").rsplit(".", 1)[-1].lower()
-        if ext in RASTER_LOGO_EXTENSIONS or ext == "svg":
-            return BytesIO(registry.logo_data)
-    return None
+    """Uploaded cooperative logo only — never the CoopBooks brand SVG."""
+    stream = coop_logo_image_stream(registry)
+    if not stream:
+        return None
+    mime = ((registry.logo_mime_type if registry else None) or "").lower()
+    ext = (registry.logo_filename or "").rsplit(".", 1)[-1].lower() if registry else ""
+    if mime in RASTER_LOGO_MIMES or f".{ext}" in RASTER_LOGO_EXTENSIONS:
+        stream.seek(0)
+        return stream
+    if mime == "image/svg+xml" or ext == "svg":
+        return _svg_bytes_to_png_stream(stream.getvalue())
+    stream.seek(0)
+    return stream
+
+
+def _svg_bytes_to_png_stream(svg_bytes):
+    """Rasterize uploaded SVG logos for ReportLab (optional svglib dependency)."""
+    try:
+        from reportlab.graphics import renderPM
+        from svglib.svglib import svg2rlg
+
+        drawing = svg2rlg(BytesIO(svg_bytes))
+        if not drawing:
+            return None
+        png = renderPM.drawToString(drawing, fmt="PNG")
+        return BytesIO(png)
+    except Exception:
+        return None
+
+
+def _draw_pdf_logo(canvas, logo_path, x, y, max_w, max_h, anchor="nw"):
+    if not logo_path:
+        return False
+    try:
+        from reportlab.lib.utils import ImageReader
+
+        logo_path.seek(0)
+        canvas.drawImage(
+            ImageReader(logo_path),
+            x,
+            y,
+            width=max_w,
+            height=max_h,
+            preserveAspectRatio=True,
+            anchor=anchor,
+            anchorAtXY=True,
+        )
+        return True
+    except Exception:
+        return False
 
 
 def _wrap_text(text, max_chars):
@@ -253,22 +308,8 @@ def _draw_bir_book_header(canvas, doc, header_ctx):
     logo_path = header_ctx.get("logo_path")
     if logo_path:
         logo_h = min(0.58 * inch, _header_row_count(header_ctx, center_wrap) * (HEADER_LINE_HEIGHT / 72.0 * inch))
-        try:
-            from reportlab.lib.utils import ImageReader
-
-            canvas.drawImage(
-                ImageReader(logo_path),
-                left,
-                header_top,
-                width=max_logo_w,
-                height=logo_h,
-                preserveAspectRatio=True,
-                anchor="nw",
-                anchorAtXY=True,
-            )
+        if _draw_pdf_logo(canvas, logo_path, left, header_top, max_logo_w, logo_h, anchor="nw"):
             lowest_y = min(lowest_y, header_top - logo_h)
-        except Exception:
-            pass
 
     name_y = header_top - 12
     canvas.setFont("Helvetica-Bold", 11)
@@ -312,10 +353,24 @@ def _bir_book_page(canvas, doc, header_ctx):
 
 def _cas_header_footer(canvas, doc, title, coop_name):
     canvas.saveState()
+    header_ctx = _coop_header_context()
+    logo_path = header_ctx.get("logo_path")
+    text_y = letter[1] - 0.5 * inch
+    if logo_path and _draw_pdf_logo(
+        canvas,
+        logo_path,
+        inch,
+        letter[1] - 0.42 * inch,
+        0.55 * inch,
+        0.42 * inch,
+        anchor="sw",
+    ):
+        text_y = letter[1] - 0.88 * inch
+
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.grey)
-    canvas.drawString(inch, letter[1] - 0.5 * inch, f"{coop_name} — {SYSTEM_NAME} v{SYSTEM_VERSION}")
-    canvas.drawRightString(letter[0] - inch, letter[1] - 0.5 * inch, title)
+    canvas.drawString(inch, text_y, f"{coop_name} — {SYSTEM_NAME} v{SYSTEM_VERSION}")
+    canvas.drawRightString(letter[0] - inch, text_y, title)
     canvas.drawCentredString(letter[0] / 2, 0.5 * inch, f"Page {doc.page}")
     canvas.restoreState()
 

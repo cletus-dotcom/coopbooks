@@ -3,26 +3,29 @@
 import platform
 import sys
 
-from app import db
 from app.audit_service import audit_trail_rows
 from app.bir_cas_config import (
     BIR_CAS_CHECKLIST,
     BIR_CAS_REQUIREMENTS,
+    BIR_EXTRA_MODULES,
+    BIR_MODULE_CLASSIFICATION,
     BIR_REFERENCE,
     BIR_REFERENCE_URL,
     DATABASE_PLATFORM,
+    DEPLOYMENT_MODEL,
+    HOSTING_OPTIONS,
     SAMPLE_LAYOUT_REPORTS,
     SOFTWARE_TYPE,
     SYSTEM_NAME,
     SYSTEM_RELEASE,
     SYSTEM_VERSION,
     TECH_STACK,
+    WEB_SERVER,
 )
 from app.config import USER_ROLES, can_post_entries, is_admin_role
-from app.models import Account, AuditLog, Cooperative, JournalEntry, Member, User
-
-
-from app.tenant_manager import get_current_coop
+from app.models import Account, AuditLog, JournalEntry, Member, User
+from app.modules_config import APP_MODULES
+from app.tenant_manager import get_coop_registry, get_current_coop
 
 
 def _requirement(slug):
@@ -32,8 +35,53 @@ def _requirement(slug):
     return None
 
 
+def _registry_profile(coop, registry):
+    """Cooperative identity fields for BIR Annex A-3."""
+    name = (coop.name if coop else None) or (registry.name if registry else None) or "—"
+    registration_no = (getattr(coop, "registration_no", None) or (registry.registration_no if registry else None))
+    tin = (getattr(coop, "tin", None) or (registry.tin if registry else None))
+    rdo = (getattr(coop, "rdo", None) or (registry.rdo if registry else None))
+    address = (getattr(coop, "address", None) or (registry.address if registry else None))
+    return {
+        "name": name,
+        "registration_no": registration_no,
+        "tin": tin,
+        "rdo": rdo,
+        "address": address,
+    }
+
+
+def _format_tin_rdo(profile):
+    parts = []
+    if profile.get("tin"):
+        parts.append(f"TIN: {profile['tin']}")
+    if profile.get("rdo"):
+        parts.append(f"RDO: {profile['rdo']}")
+    return " · ".join(parts) if parts else "Configure in cooperative profile"
+
+
+def _documented_modules():
+    modules = []
+    for key, spec in APP_MODULES.items():
+        if key == "bir_cas":
+            continue
+        meta = BIR_MODULE_CLASSIFICATION.get(key, {})
+        route = spec["route_prefixes"][0] if spec.get("route_prefixes") else "—"
+        modules.append({
+            "name": spec["label"],
+            "description": meta.get("description", spec["label"]),
+            "route": route,
+            "bir_module": meta.get("bir_module", "Application Module"),
+            "subscription": not spec.get("core", False),
+        })
+    modules.extend(BIR_EXTRA_MODULES)
+    return modules
+
+
 def system_description_context():
     coop = get_current_coop()
+    registry = get_coop_registry()
+    profile = _registry_profile(coop, registry)
     return {
         "requirement": _requirement("system-description"),
         "system_name": SYSTEM_NAME,
@@ -42,31 +90,29 @@ def system_description_context():
         "software_type": SOFTWARE_TYPE,
         "database_platform": DATABASE_PLATFORM,
         "tech_stack": TECH_STACK,
+        "deployment_model": DEPLOYMENT_MODEL,
+        "hosting_options": HOSTING_OPTIONS,
+        "web_server": WEB_SERVER,
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "os_platform": platform.platform(),
         "coop": coop,
+        "registry": registry,
         "feature_mapping": [
-            {"field": "Software Name", "value": SYSTEM_NAME, "source": "bir_cas_config.SYSTEM_NAME"},
-            {"field": "Version Number", "value": SYSTEM_VERSION, "source": "bir_cas_config.SYSTEM_VERSION"},
-            {"field": "Release Date", "value": SYSTEM_RELEASE, "source": "bir_cas_config.SYSTEM_RELEASE"},
+            {"field": "Software Name", "value": SYSTEM_NAME, "source": "CoopBooks application"},
+            {"field": "Version Number", "value": SYSTEM_VERSION, "source": "Release tag"},
+            {"field": "Release Date", "value": SYSTEM_RELEASE, "source": "Annex A-3 Part I"},
             {"field": "Type of Software", "value": SOFTWARE_TYPE, "source": "Annex A-3 Part I"},
+            {"field": "Deployment Model", "value": DEPLOYMENT_MODEL, "source": "Single cooperative installation"},
+            {"field": "Hosting Environment", "value": HOSTING_OPTIONS, "source": "On-premises or cloud computing"},
             {"field": "Database Platform", "value": DATABASE_PLATFORM, "source": "PostgreSQL via SQLAlchemy"},
+            {"field": "Application Server", "value": WEB_SERVER, "source": "Production WSGI host"},
             {"field": "Software Provider", "value": "In-house / Cooperative IT", "source": "Cooperative maintenance"},
-            {"field": "Taxpayer Name", "value": coop.name if coop else "—", "source": "cooperatives.name"},
-            {"field": "TIN / RDO", "value": _format_tin_rdo(coop), "source": "cooperatives.tin, cooperatives.rdo"},
+            {"field": "Taxpayer Name", "value": profile["name"], "source": "Cooperative registry profile"},
+            {"field": "CDA Registration No.", "value": profile["registration_no"] or "—", "source": "coop_registry.registration_no"},
+            {"field": "TIN / RDO", "value": _format_tin_rdo(profile), "source": "coop_registry.tin, coop_registry.rdo"},
+            {"field": "Business Address", "value": profile["address"] or "—", "source": "coop_registry.address"},
         ],
     }
-
-
-def _format_tin_rdo(coop):
-    if not coop:
-        return "—"
-    parts = []
-    if coop.tin:
-        parts.append(f"TIN: {coop.tin}")
-    if coop.rdo:
-        parts.append(f"RDO: {coop.rdo}")
-    return " · ".join(parts) if parts else "Configure in cooperative profile"
 
 
 def process_flows_context():
@@ -74,107 +120,78 @@ def process_flows_context():
         "requirement": _requirement("process-flows"),
         "flows": [
             {
-                "title": "Member Transaction → General Ledger to Financial Reports",
+                "title": "Member Registration and Ledger Posting",
                 "steps": [
-                    "Source document (member application, deposit slip, loan voucher, receipt)",
-                    "Staff posts member ledger entry (Members → Member Ledger)",
-                    "System auto-generates balanced journal entry (double-entry)",
+                    "Staff registers member in Members Registry (CDA MC 2012-16 fields)",
+                    "Member share capital, savings, and loan balances maintained in master file",
+                    "Staff posts member ledger transaction (share, savings, loan, or other)",
+                    "System validates amounts and auto-generates balanced journal entry",
                     "Journal lines posted to Chart of Accounts (CDA standard codes)",
-                    "Account balances updated in real time",
-                    "Financial reports generated: Trial Balance, SFC, Operations",
+                    "Member Subsidiary Ledger and General Ledger updated in real time",
+                    "Audit trail records CREATE action with user and timestamp",
                 ],
                 "app_routes": [
-                    "/members → /members/<no>/ledger",
-                    "/journal → /journal/<entry_no>",
-                    "/accounts",
-                    "/reports/sfc, /reports/operations, /reports/trial-balance",
+                    "/members",
+                    "/members/<no>/ledger",
+                    "/journal",
+                    "/reports/member-subsidiary",
                 ],
             },
             {
                 "title": "Manual General Journal Entry",
                 "steps": [
-                    "Staff creates journal entry with entry number and date",
-                    "Debit and credit lines entered per active account",
+                    "Staff creates journal entry with entry number and transaction date",
+                    "Debit and credit lines entered per active chart-of-accounts code",
                     "System validates debits equal credits before posting",
                     "Entry recorded with posted_by user stamp",
                     "Audit trail logs CREATE action",
-                    "Balances reflected in Trial Balance and Ledger reports",
+                    "Balances reflected in Trial Balance, General Ledger, and CDA reports",
                 ],
-                "app_routes": ["/journal/new", "/journal", "/reports/general-ledger"],
+                "app_routes": [
+                    "/journal/new",
+                    "/journal",
+                    "/reports/general-ledger",
+                    "/reports/trial-balance",
+                ],
             },
             {
-                "title": "User Access & Audit Control",
+                "title": "CDA and BIR Financial Reporting",
                 "steps": [
-                    "User authenticates via login (session-based)",
-                    "Role checked on each request (Admin, Staff, Member)",
-                    "Write operations restricted to Admin/Staff",
-                    "Admin-only routes for user management",
-                    "All CREATE/UPDATE/DELETE logged with user, timestamp, IP",
-                    "Audit trail printable for BIR submission",
+                    "Posted journal entries accumulate account balances",
+                    "Staff opens Reports → CDA Reports for Statement of Financial Condition and Operations",
+                    "Staff opens Reports → BIR Books of Accounts for RR 9-2009 layouts",
+                    "Reports display cooperative name, TIN, and uploaded logo on print/PDF",
+                    "PDF export available for each book and CAS requirement section",
                 ],
-                "app_routes": ["/login", "/admin/users", "/documentation/system-controls"],
+                "app_routes": [
+                    "/reports/cda",
+                    "/reports/bir-books",
+                    "/documentation",
+                ],
+            },
+            {
+                "title": "User Access, Module Control, and Audit Trail",
+                "steps": [
+                    "User authenticates via login (session-based, password hashing)",
+                    "Role checked on each request (Admin, Staff, or Member)",
+                    "Write operations restricted to Admin and Staff roles",
+                    "Admin-only routes for user management (/admin/users)",
+                    "Optional feature modules gated by cooperative subscription",
+                    "All CREATE/UPDATE/DELETE logged with user, timestamp, entity, and IP",
+                    "Audit trail viewable and printable for BIR submission",
+                ],
+                "app_routes": [
+                    "/login",
+                    "/admin/users",
+                    "/documentation/audit-trail",
+                    "/documentation/system-controls",
+                ],
             },
         ],
     }
 
 
 def system_modules_context():
-    modules = [
-        {
-            "name": "Dashboard",
-            "description": "Financial overview, member counts, cash, loans, journal activity",
-            "route": "/dashboard",
-            "bir_module": "Management Reports",
-        },
-        {
-            "name": "General Journal",
-            "description": "Double-entry journal posting with entry numbering and validation",
-            "route": "/journal",
-            "bir_module": "General Ledger / Journal",
-        },
-        {
-            "name": "Chart of Accounts",
-            "description": "CDA-standard cooperative chart with account types and balances",
-            "route": "/accounts",
-            "bir_module": "General Ledger",
-        },
-        {
-            "name": "Members Registry",
-            "description": "Member master file, share capital, savings balances",
-            "route": "/members",
-            "bir_module": "Subsidiary Ledger (Members' Equity)",
-        },
-        {
-            "name": "Member Ledger",
-            "description": "Share, savings, and loan transactions with auto journal integration",
-            "route": "/members/<no>/ledger",
-            "bir_module": "Subsidiary Ledger",
-        },
-        {
-            "name": "CDA Financial Reports",
-            "description": "Statement of Financial Condition, Operations, Trial Balance",
-            "route": "/reports",
-            "bir_module": "Financial Statements",
-        },
-        {
-            "name": "BIR Books of Accounts",
-            "description": "General Journal, General Ledger, Member Subsidiary Ledger print-outs",
-            "route": "/reports/general-journal",
-            "bir_module": "Books of Accounts (RR 9-2009)",
-        },
-        {
-            "name": "User Management",
-            "description": "Role-based access control (Admin, Staff, Member)",
-            "route": "/admin/users",
-            "bir_module": "System Controls / Security",
-        },
-        {
-            "name": "BIR CAS Documentation",
-            "description": "Mandatory technical requirements per RMC 5-2021 with PDF export",
-            "route": "/documentation",
-            "bir_module": "Systems Documentation",
-        },
-    ]
     stats = {
         "accounts": Account.query.filter_by(is_active=True).count(),
         "journal_entries": JournalEntry.query.count(),
@@ -183,7 +200,7 @@ def system_modules_context():
     }
     return {
         "requirement": _requirement("system-modules"),
-        "modules": modules,
+        "modules": _documented_modules(),
         "stats": stats,
     }
 
@@ -222,8 +239,10 @@ def system_controls_context():
             "Session-based authentication with password hashing (Werkzeug PBKDF2)",
             "Route guards on all protected endpoints (app/auth.py)",
             "Role normalization and inactive account blocking",
-            "Staff-only write endpoints for journal and member transactions",
-            "Admin-only user management and documentation PDF generation",
+            "Admin and Staff write access for journal and member transactions",
+            "Admin-only user management at /admin/users",
+            "Optional feature modules gated by cooperative subscription",
+            "Cooperative profile stores TIN, RDO, and logo used on reports and PDFs",
             "Audit trail with timestamp, user, action, entity, and IP address",
             "Double-entry validation — debits must equal credits before posting",
             "Journal entry numbers are unique and sequential per fiscal year",
@@ -242,36 +261,44 @@ def system_controls_context():
 
 def _role_restrictions(role):
     if is_admin_role(role):
-        return "Full access including user management and all documentation"
+        return "Full cooperative access including user management and all subscribed modules"
     if can_post_entries(role):
-        return "Can post journal entries and member transactions; read-only admin"
+        return "Can post journal entries and member transactions; cannot manage users"
     return "Read-only access to dashboard, reports, and accounts"
 
 
 def disaster_recovery_context():
     coop = get_current_coop()
+    registry = get_coop_registry()
+    profile = _registry_profile(coop, registry)
     return {
         "requirement": _requirement("disaster-recovery"),
         "retention_years": 10,
         "backup_procedures": [
             "Daily automated PostgreSQL pg_dump to secure off-site storage",
-            "Application logs retained with audit trail in database",
-            "Database transaction log (WAL) archiving for point-in-time recovery",
-            "Backup verification via monthly restore test to staging environment",
+            "Database hosted on-premises or in a cloud computing environment with encrypted connections",
+            "Application audit trail stored in PostgreSQL and included in backups",
+            "Database write-ahead log (WAL) archiving for point-in-time recovery when enabled",
+            "Monthly restore test to a staging environment to verify backup integrity",
         ],
         "restoration_procedures": [
-            "Identify failure scope (application, database, or full server)",
-            "Restore latest verified pg_dump to PostgreSQL instance",
+            "Identify failure scope (application host, database, or full site)",
+            "Restore latest verified pg_dump to a PostgreSQL instance (local or cloud)",
             "Replay WAL archives if point-in-time recovery is required",
-            "Restart CoopBooks application and verify audit trail continuity",
-            "Validate Trial Balance totals match pre-disaster snapshot",
+            "Redeploy CoopBooks on the application server and verify HTTPS access",
+            "Confirm audit trail continuity and validate Trial Balance against pre-disaster totals",
         ],
-        "physical_location": "Primary: cooperative server / cloud VM · Secondary: encrypted off-site backup",
+        "physical_location": (
+            f"Primary: cooperative head office or cloud computing environment · "
+            f"Secondary: encrypted off-site backup (cloud storage or physical media)"
+        ),
         "coop": coop,
+        "profile": profile,
         "feature_mapping": [
             {"control": "10-year retention", "implementation": "PostgreSQL backups + audit_logs table"},
             {"control": "Archive/restore", "implementation": "pg_dump / pg_restore documented procedures"},
-            {"control": "Audit trail preservation", "implementation": "audit_logs included in DB backups"},
+            {"control": "Audit trail preservation", "implementation": "audit_logs included in database backups"},
+            {"control": "Off-site copy", "implementation": "Encrypted backup to separate cloud or media location"},
         ],
     }
 
@@ -284,6 +311,7 @@ def documentation_index_context():
         "bir_reference_url": BIR_REFERENCE_URL,
         "system_name": SYSTEM_NAME,
         "system_version": SYSTEM_VERSION,
+        "deployment_model": DEPLOYMENT_MODEL,
     }
 
 
@@ -315,6 +343,8 @@ def pdf_data_for_slug(slug):
         return None
 
     coop = get_current_coop()
+    registry = get_coop_registry()
+    profile = _registry_profile(coop, registry)
     base = {
         "slug": slug,
         "title": ctx["requirement"]["title"],
@@ -322,7 +352,7 @@ def pdf_data_for_slug(slug):
         "bir_reference": ctx["requirement"]["bir_reference"],
         "system_name": SYSTEM_NAME,
         "system_version": SYSTEM_VERSION,
-        "coop_name": coop.name if coop else SYSTEM_NAME,
+        "coop_name": profile["name"],
         "generated_for": "BIR CAS Registration — RMC No. 5-2021",
     }
 
@@ -334,8 +364,10 @@ def pdf_data_for_slug(slug):
                 for k, v in {
                     "tech_stack": TECH_STACK,
                     "database": DATABASE_PLATFORM,
+                    "deployment": DEPLOYMENT_MODEL,
+                    "hosting": HOSTING_OPTIONS,
+                    "web_server": WEB_SERVER,
                     "python": ctx["python_version"],
-                    "platform": ctx["os_platform"],
                 }.items()
             ]),
         ]
@@ -347,7 +379,12 @@ def pdf_data_for_slug(slug):
     elif slug == "system-modules":
         base["sections"] = [
             ("Registered Modules", [
-                {"name": m["name"], "description": m["description"], "route": m["route"]}
+                {
+                    "name": m["name"],
+                    "description": m["description"],
+                    "route": m["route"],
+                    "bir_module": m["bir_module"],
+                }
                 for m in ctx["modules"]
             ]),
         ]
@@ -370,6 +407,7 @@ def pdf_data_for_slug(slug):
             ("Retention & Location", [
                 {"field": "Retention Period", "value": f"{ctx['retention_years']} years"},
                 {"field": "Physical Location", "value": ctx["physical_location"]},
+                {"field": "Taxpayer", "value": profile["name"]},
             ]),
         ]
     return base
